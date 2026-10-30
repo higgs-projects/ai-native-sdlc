@@ -3,12 +3,12 @@ name: Hook tests
 on:
   pull_request:
     paths:
-      - "plugins/ai-sdlc/hooks/**"
+      - "plugins/ai-sdlc/**"
       - ".github/workflows/hook-tests.yml"
   push:
     branches: [main]
     paths:
-      - "plugins/ai-sdlc/hooks/**"
+      - "plugins/ai-sdlc/**"
       - ".github/workflows/hook-tests.yml"
 
 permissions:
@@ -16,9 +16,13 @@ permissions:
 
 jobs:
   hooks:
-    name: Gate and state hooks
+    name: Gate, state, and artifact contracts
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: bash plugins/ai-sdlc/hooks/test-artifact-gate.sh
       - run: bash plugins/ai-sdlc/hooks/test-sdlc-state.sh
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - run: python3 -m unittest discover -s plugins/ai-sdlc/scripts -p 'test_*.py' -v

@@ -1,16 +1,16 @@
-# [Service name]
+# [服务名称]
 
-## Commands
-- Build: [command]
-- Test: [command]
-- Lint: [command]
+## 命令
+- 构建：[命令]
+- 测试：[命令]
+- Lint：[命令]
 
-## Conventions
-[team-specific rules]
+## 约定
+[团队专属规则]
 
-## Architecture
-[system design notes]
+## 架构
+[系统设计说明]
 
-## Things Claude gets wrong
-<!-- Record recurring, repository-specific mistakes with the correct action and why it matters. Prefer testable rules, such as “use tenant-scoped queries; unscoped queries leak data.” -->
-[common mistakes to avoid]
+## Claude 容易犯的错误
+<!-- 记录本仓库反复出现的错误、正确做法及原因。优先采用可测试规则，例如“使用租户范围查询；无租户范围的查询会泄露数据”。 -->
+[需要避免的常见错误]

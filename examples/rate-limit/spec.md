@@ -1,28 +1,28 @@
-# Specification: public API rate limiting
+# Specification: 公开 API 限流
 
 ## Requirements
 
-- Apply a fixed 120-request allowance per rolling 60-second window to all routes under `/v1/public`.
-- Identify callers by API-key ID when a valid key is supplied; otherwise use a salted hash of the client IP.
-- Return `429` before application work begins when the allowance is exhausted, with `Retry-After`, `RateLimit-Limit`, `RateLimit-Remaining`, and `RateLimit-Reset` headers.
-- Increment a `public_api_rate_limit_rejections_total` metric labeled only by route template and identity type.
-- If Redis is unavailable, allow the request, emit `public_api_rate_limit_store_error_total`, and log no key or raw IP value.
+- 对 `/v1/public` 下所有路由采用滚动 60 秒窗口，固定额度 120 次。
+- 有有效 key 时按 API-key ID 标识调用者，否则使用客户端 IP 的加盐哈希。
+- 额度耗尽时，在应用执行工作前返回 `429`，携带 `Retry-After`、`RateLimit-Limit`、`RateLimit-Remaining` 和 `RateLimit-Reset`。
+- 增加 `public_api_rate_limit_rejections_total` 指标，仅以路由模板和身份类型为标签。
+- Redis 不可用时放行，记录 `public_api_rate_limit_store_error_total`，不在日志记录 key 或原始 IP。
 
 ## Design
 
-Gateway middleware derives an identity token, then performs an atomic Redis sorted-set sliding-window update with a 65-second TTL. The route template and identity token form the key. Middleware writes standard headers for accepted and rejected requests. A feature flag enables the middleware by route group; rollout starts at 10% of public traffic.
+网关中间件推导身份 token，再原子更新 Redis 有序集合滑动窗口，TTL 为 65 秒。键由路由模板和身份 token 组成。对允许和拒绝请求均写标准响应头。通过功能开关按路由组启用，初始覆盖 10% 公开流量。
 
 ## Organization skill constraints
 
-- Security: rate-limit keys use API-key IDs or HMAC-SHA-256 IP hashes with a server-held rotation secret; no raw identity value is logged.
-- Compliance: hashed IP quota keys expire within 65 seconds and are not exported to analytics.
-- Data: metrics use bounded route templates and identity type only, preventing high-cardinality identities.
+- Security：限流键使用 API-key ID，或以服务端持有的轮换秘密对 IP 做 HMAC-SHA-256 哈希；不记录原始身份值。
+- Compliance：IP 哈希配额键 65 秒内过期，不导出到分析系统。
+- Data：指标仅使用有界路由模板和身份类型，避免高基数身份标签。
 
 ## Flagged concerns
 
-- The fail-open Redis behavior protects availability but could allow temporary abuse; API Platform owns the alert and outage review.
-- IPv6 privacy addresses may change frequently; Security must approve whether they need a separate policy.
+- Redis 故障放行保护可用性，但可能临时允许滥用；API Platform 负责告警和故障复盘。
+- IPv6 隐私地址可能频繁变化；Security 必须批准是否需要独立策略。
 
 ## Extension contract
 
-- Extension: gateway middleware contract v1; input is request context, output is allow/deny plus rate-limit headers, and Redis errors produce allow plus an operational metric.
+- Extension：网关中间件契约 v1；输入为请求上下文，输出为允许／拒绝及限流响应头；Redis 错误时放行并产生运维指标。

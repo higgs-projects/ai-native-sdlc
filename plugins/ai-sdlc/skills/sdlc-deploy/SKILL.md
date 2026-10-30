@@ -1,175 +1,101 @@
 ---
 name: sdlc-deploy
-description: Prepare a verified change for human PR review by running REVIEW.md passes through the sdlc-reviewer subagent and posting ranked findings. Do NOT use for intent or scope decisions, accepting organizational risk, self-approval, merging, deploying, or bypassing branch protection.
+description: 对已验证的变更，通过 sdlc-reviewer 子 Agent 执行 REVIEW.md 规定的审查项，发布按严重程度排序的发现，为人工 PR 评审准备材料。不用于决定需求或范围、接受组织风险、自行批准、合并、部署或绕过分支保护。
 ---
 
-# SDLC Deploy
+# SDLC 审查交付
 
-Run Stage 5 of 6 in the AI-Native SDLC playbook described in `docs/PLAYBOOK.md`.
+执行 `docs/PLAYBOOK.md` 所述 AI 原生 SDLC 六阶段中的第 5 阶段。
 
-## Purpose
+## 目标
 
-Prepare the pull request and review evidence. This stage posts findings and stops
-for a human; it never merges or deploys.
+准备 PR 和审查证据。本阶段发布发现后停下等待真人，绝不合并或部署。
+不评判原始需求是否值得实施，不代替组织接受风险。
 
-Do not judge whether the original intent was worthwhile. Do not accept risk for the
-organization.
+## 进入门禁
 
-## Entry gate
+仅在 `sdlc-test` 已完成、验证证据通过且代码可供审查时继续。
+阅读测试报告，确认包含真实通过输出，以及针对变更过的 `CLAUDE.md`、技能或 hook 的适用 eval 证据。
+若验证不完整、因后续修改而过时、缺失或失败，返回 `sdlc-test` 并停止。
 
-Proceed only when `sdlc-test` has completed with green verification evidence and
-the code is ready for review.
+## 操作步骤
 
-Read the test report. Confirm it includes actual passing output and applicable
-eval evidence for any changed `CLAUDE.md`, skill, or hook.
+0. 确定本次变更的 slug，读取 `.sdlc/<slug>/spec.md` 和 `.sdlc/<slug>/plan.md`。PR 描述必须链接这些产物，使评审者无需离开 PR 就能了解 diff 背后的已接受 intent、spec 和 plan。快速路径仅有 `plan.md`：链接它，并在 PR 中引用 `## Fast path` 声明，说明由谁、基于什么原因将变更判为低风险。
+1. 定位项目 `REVIEW.md`。
+2. 若存在，读取所有适用审查项、深度设置、轮次上限、敏感路径清单和细节问题数量上限。
+3. 若不存在，记录此事实，并基于合理判断继续必需审查。
+4. 若 `.sdlc/<slug>/review-findings.md` 存在，读取它；其中记录轮次、各历史轮次审查的 SHA，以及所有已发布发现。
+5. 若采用快速路径，现在用真实 diff 对照敏感路径清单。触及任一敏感路径即撤销快速路径资格：指出路径，将变更转交 `sdlc-plan`，从阶段 1、2 进入。这与 `sdlc-build` 在声明包含该文件时应拒绝的规则一致。不要继续后续审查。
+6. 确定轮次。若即将进入第 4 轮，停止审查，记录已达到上限，让作者返回 `plan.md` 重新考虑方案，不再逐项修复发现。
+7. 确定范围：第 1 轮审查整个变更；后续只审查相较上一轮记录 SHA 的 diff。
+8. 汇总范围内变更、验证证据及 `REVIEW.md` 指导。
+9. 以 review 模式调用 `sdlc-reviewer` 子 Agent，提供变更及 `REVIEW.md` 为当前深度指定的审查项。Standard、Deep 包含 Bugs、Security、Compliance；Quick 包含 Bugs、Security。所有深度均执行 Security。
+10. 移除所有历史轮次已发布的发现，并统计数量。
+11. 在全新上下文中，以 verify 模式再次调用 `sdlc-reviewer` 子 Agent，仅提供剩余发现及其引用的 diff，不提供产生发现的推理。丢弃所有被判为不真实的发现，并统计数量。
+12. 要求每项保留发现使用 `REVIEW.md` 的严重程度：`Important`、`Minor`、`Nit` 或 `Pre-existing`。
+13. 遵守 `REVIEW.md` 的细节问题上限，例如 `max 5 nits` 表示最多包含五项 Nit。
+14. 若未设置上限，合理判断，确保细节问题可操作。
+15. 使用插件模板，将本轮追加至 `.sdlc/<slug>/review-findings.md`：轮次、阶段、被审查 SHA、范围、执行的审查项、发现、去重数量及复核拒绝数量。
+16. 扫描 `.sdlc/*/review-findings.md`，查找已出现在至少两项变更中的问题类别；记录到本变更文件的 **Recurring**，并注明用什么规则固化预防。
+17. 创建或更新 PR，包含上下文、测试证据和发现。
+18. 以 PR 评论或 PR 正文发布发现。
+19. 引用审查发现，明确停下等待人工批准。
 
-If verification is incomplete, stale after changes, missing, or red, return to
-`sdlc-test` and stop.
+只向评审者提供证据与审查范围，不授予其豁免风险的权限。
 
-## Procedure
+## 评审者请求
 
-0. Identify the slug for this change and read `.sdlc/<slug>/spec.md` and
-   `.sdlc/<slug>/plan.md`. The PR description must link them, so a reviewer can see
-   the accepted intent, spec, and plan behind the diff without leaving the PR. A
-   fast-path change has only `plan.md`: link that, and quote its `## Fast path`
-   declaration in the PR so the reviewer sees who called the change low-risk and why.
-1. Locate the project's `REVIEW.md`.
-2. If it exists, read every applicable review pass, the depth setting, the round
-   cap, the sensitive-path list, and the nit cap.
-3. If it does not exist, record that fact and continue with the required review
-   passes using sound judgment.
-4. Read `.sdlc/<slug>/review-findings.md` if it exists. It carries the round
-   number, the SHA each earlier round reviewed, and every finding already posted.
-5. If the change took the fast path, compare the real diff against the
-   sensitive-path list now. A diff touching any sensitive path revokes the fast
-   path: say which path it reached, and route the change to `sdlc-plan` to enter
-   through Stage 1 and Stage 2, exactly as `sdlc-build` would have refused the
-   declaration had the file been declared. Do not review it onward.
-6. Determine the round number. If this would be round 4, stop reviewing: record
-   that the cap is reached and return the author to `plan.md` to reconsider the
-   approach rather than fixing findings one by one.
-7. Determine the review scope. Round 1 reviews the whole change; later rounds
-   review only the diff since the previous round's recorded SHA.
-8. Assemble the changes in scope, verification evidence, and `REVIEW.md`
-   instructions.
-9. Invoke the `sdlc-reviewer` subagent in review mode with the changes and the
-   passes `REVIEW.md` names for this depth. At Standard and Deep that is Bugs,
-   Security, and Compliance; at Quick it is Bugs and Security. Security runs at
-   every depth.
-10. Drop every finding an earlier round already posted. Count them.
-11. Invoke the `sdlc-reviewer` subagent again in verify mode, in a fresh context,
-    with the surviving findings and the diff they cite, and without the reasoning
-    that produced them. Discard every finding it judges not real. Count them.
-12. Require each surviving finding to carry a `REVIEW.md` severity: `Important`,
-    `Minor`, `Nit`, or `Pre-existing`.
-13. Enforce the nit cap from `REVIEW.md`; for example, if it says `max 5 nits`,
-    include at most five nits.
-14. If `REVIEW.md` has no cap, use judgment and keep nits actionable.
-15. Append this round to `.sdlc/<slug>/review-findings.md` using the plugin's
-    template: round number, stage, reviewed SHA, scope, passes run, findings,
-    suppressed count, and verifier-rejected count.
-16. Scan `.sdlc/*/review-findings.md` for a finding class that now appears in two
-    or more changes, and record it under **Recurring** in this change's file, with
-    what encodes it.
-17. Create or update the pull request with context, test evidence, and findings.
-18. Post the findings as a PR comment or include them in the PR body.
-19. Cite the review findings and explicitly stop for human approval.
+要求 `sdlc-reviewer` 子 Agent 检查实际 diff，报告：
 
-Give the reviewer only evidence and review scope, not authority to waive risks.
+- Bugs 审查发现的缺陷。
+- Security 审查发现的安全疑虑。
+- Compliance 审查发现的合规疑虑。
+- 每项发现的严重程度：`Important`、`Minor`、`Nit` 或 `Pre-existing`。
+- 可获取的文件与行号引用。
+- 简洁理由，以及适用的修复建议。
+- 因早前轮次已发布而抑制的发现数量。
 
-## Reviewer request
+并非本次变更引入的真实缺陷属于 `Pre-existing`。评审者报告它，但它不阻塞合并，也不计入作者责任。若已有缺陷属于安全问题，则仍归入 Security，保留真实严重程度，像其他安全问题一样阻塞合并。
 
-Tell the `sdlc-reviewer` subagent to inspect the actual diff and report:
+复核者是同一个子 Agent 的 verify 模式，运行于独立上下文，仅查看发现和被引用代码。不传入评审者推理，不允许复核者改变严重程度或新增发现。每项发现仅回答一个问题：该失败是否真实发生？
 
-- Bugs found by the Bugs pass.
-- Security concerns found by the Security pass.
-- Compliance concerns found by the Compliance pass.
-- Severity for each finding: `Important`, `Minor`, `Nit`, or `Pre-existing`.
-- File and line references where available.
-- Concise rationale and a suggested remediation when appropriate.
-- How many findings it suppressed as already posted in an earlier round.
+传递项目 `REVIEW.md` 规则，不用自行编造的评审标准替代。
+若没有发现，记录审查未发现问题，不编造评论。
 
-A real defect in code this change did not introduce is `Pre-existing`. The reviewer
-reports it; it does not block merge and is not counted against the author. A
-pre-existing defect that is a security finding stays under Security at its real
-severity and blocks merge like any other.
+## 发现与 PR 内容
 
-The verifier runs as the same subagent in verify mode, in its own context, and sees
-only the findings and the cited code. Do not pass it the reviewer's reasoning, and
-do not let it change a severity or add a finding. It answers one question per
-finding: does this failure actually happen?
+在 PR 中区分 Important 与 Nit。
+Nit 数量遵守 `REVIEW.md` 上限。Important 不是 Nit，不能被数量上限隐藏。
 
-Pass through the project's `REVIEW.md` rules. Do not replace them with an invented
-review rubric.
+将所有 `Pre-existing` 发现列在 PR 的独立标题下，注明位置和建议处置方式：现在修复、关联待办，或说明理由后接受。不得默默丢弃已有缺陷。循环中其他环节不专门寻找历史缺陷，这份列表是它们被呈现的地方。
 
-If no findings exist, record that the passes found none rather than fabricating
-comments.
+包含阶段 4 的测试证据，供真人评估。
+说明是否找到 `REVIEW.md`；若找到，说明适用审查项、深度及当前轮次。
+说明本轮发布数量、因已报告而抑制的数量，以及复核者拒绝的数量。
+不能修改代码使发现消失后，跳过测试阶段的新验证。
 
-## Findings and PR content
+## 在 CI 中运行
 
-Separate Important findings from Nits in the PR content.
+同样的审查可无人值守运行。在 CI 中，以非交互方式调用 Claude，在具有文件系统和网络隔离的沙箱中执行，范围限定为仓库与指定审查项。沙箱 CI 与交互运行一样发布发现，不获得合并、部署或豁免发现的权限。
+CI 审查是提供给真人评审者的证据，不能替代真人。
 
-Keep the number of nits within the `REVIEW.md` cap. Important findings are not
-nits and must not be hidden by the cap.
+## 禁止事项
 
-List every `Pre-existing` finding in the PR under its own heading, with the
-location and a proposed disposition: fix now, a backlog reference, or accepted
-with a reason. A pre-existing finding is never silently dropped. Nothing else in
-this loop looks for old defects, so this list is the only place they surface.
+绝不合并 PR。
+绝不部署代码。
+绝不绕过、禁用或规避审批门禁 hook。hook 自行触发，分支保护强制执行合并门禁，Agent 无权覆盖两者。
+绝不代替组织接受安全、合规、运维或产品风险。
+绝不将自己发布 PR 视为人工批准。
 
-Include test evidence from Stage 4 so a human can evaluate the change.
+## 退出门禁
 
-State whether `REVIEW.md` was found and, if so, which passes governed the review,
-at which depth, and which round this is.
+发布前，检查 `.sdlc/<slug>/review-findings.md` 的 **Recurring**。每种在至少两项变更中出现的问题类别，都必须说明固化位置：`CLAUDE.md` 的某条指导、lint 规则或 `REVIEW.md` 规则。任一行未记录固化措施，门禁就不能通过。修复单个实例没有消除整类问题；此规则旨在预防第三次出现。
 
-State the round's counts: findings posted, suppressed as already reported, and
-rejected by the verifier.
+发布 PR 并引用按严重程度排序的发现，然后明确停止。
+下一步必须是通过分支保护或明确 `LGTM` 给出的人工批准。
+若人工批准尚未发生，不得交接到维护阶段。
 
-Do not alter code merely to make findings disappear without returning to the test
-stage for fresh verification.
+## 交接
 
-## Running in CI
-
-The same review runs unattended. In CI, invoke Claude non-interactively inside a
-sandbox with filesystem and network isolation, scoped to the repository and the
-review passes. A sandboxed CI run posts findings exactly as an interactive run does;
-it gains no authority to merge, deploy, or waive a finding.
-
-Treat a CI review as evidence for the human reviewer, never as a substitute for one.
-
-## Prohibitions
-
-Never merge the PR.
-
-Never deploy the code.
-
-Never bypass, disable, or work around the approval-gate hook. It fires on its own,
-and branch protection enforces the merge gate; an agent cannot override either.
-
-Never accept a security, compliance, operational, or product risk on behalf of the
-organization.
-
-Never treat your own PR post as human approval.
-
-## Exit gate
-
-Before posting, check **Recurring** in `.sdlc/<slug>/review-findings.md`. Every
-finding class now seen in two or more changes must name what encodes it: a line in
-`CLAUDE.md`, a lint rule, or a rule in `REVIEW.md`. A row with no encoding holds
-this gate. Fixing the instance is not fixing the class — the third occurrence is
-the one this prevents.
-
-Post the PR and cite the ranked findings. Then explicitly stop.
-
-The next step must be a human approval, either through branch protection or an
-explicit `LGTM`.
-
-If human approval has not happened, do not hand off to maintenance.
-
-## Handoff
-
-Only once a human approves merge through branch protection or explicit `LGTM`,
-proceed to `sdlc-maintain` after the code is deployed.
-
-Carry forward the PR link, approval evidence, review findings, and deployment
-identity if available.
+只有真人通过分支保护或明确 `LGTM` 批准合并，且代码已部署后，才进入 `sdlc-maintain`。
+携带 PR 链接、批准证据、审查发现，以及可获取的部署标识。

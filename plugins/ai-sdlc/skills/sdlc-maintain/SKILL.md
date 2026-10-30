@@ -1,32 +1,26 @@
 ---
 name: sdlc-maintain
-description: Monitor deployed code against project-root bands.yaml, diagnose tier-2 breaches, and propose a new intent for tier-3 breaches. Do NOT use to apply production fixes, merge or deploy code, replace incident ownership, or make unapproved risk decisions.
+description: 根据项目根目录 bands.yaml 监控已部署代码，诊断第 2 级越界，为第 3 级越界提出新 intent。不用于实施生产修复、合并或部署代码、取代事件负责人，或作出未经批准的风险决定。
 ---
 
-# SDLC Maintain
+# SDLC 运维反馈
 
-Run Stage 6 of 6 in the AI-Native SDLC playbook described in `docs/PLAYBOOK.md`.
+执行 `docs/PLAYBOOK.md` 所述 AI 原生 SDLC 六阶段中的第 6 阶段。
 
-## Purpose
+## 目标
 
-Close the delivery loop through deterministic monitoring. Escalate a tier-3 breach
-into a proposed new intent; never apply a production fix yourself.
+通过确定性监控闭合交付循环。将第 3 级越界升级为新的 intent 提案，绝不自行实施生产修复。
+使用项目控制带作为控制策略，不用主观阈值替代声明的配置。
 
-Use the project's bands as the control policy. Do not substitute subjective
-thresholds for the declared configuration.
+## 进入门禁
 
-## Entry gate
+仅当相关代码已部署，且项目根目录存在 `bands.yaml` 时继续。
+若尚未部署，等待经人工批准的部署流程。
+若 `bands.yaml` 缺失，报告缺少控制配置并停止。
 
-Proceed only when the relevant code is deployed and `bands.yaml` exists at the
-project root.
+## 必需配置
 
-If deployment has not occurred, wait for the human-approved deployment path.
-
-If `bands.yaml` is missing, report the missing control configuration and stop.
-
-## Required configuration
-
-The project uses this contract template for `bands.yaml`:
+项目使用以下 `bands.yaml` 契约模板，配置键和机器值保持原样：
 
 ```yaml
 metric: [metric_name]
@@ -38,107 +32,67 @@ tiers:
   3sigma: { action: propose, routes: [pull_request, runbook:X] }
 ```
 
-Read the actual file rather than assuming a metric, baseline, rule, tool, or
-route from this example.
+读取实际文件，不从示例假定指标、基线、规则、工具或路由。
 
-## Procedure
+## 操作步骤
 
-1. Read `bands.yaml` in full.
-2. Identify the monitored metric, baseline, rules, tiers, actions, and configured
-   diagnosis tools.
-3. Query the appropriate monitoring source for current and relevant historical
-   data.
-4. Evaluate the observed data against the declared bands.
-5. Apply Western Electric rules when `bands.yaml` specifies them.
-6. Record the data queried, evaluation time, and resulting tier.
-7. On a tier-1 breach, log the breach and evidence.
-8. On a tier-2 breach, diagnose using only the tools listed in `bands.yaml`.
-9. Record diagnostic evidence, hypotheses, and unresolved uncertainty.
-10. On a tier-3 breach, write a new proposed fix intent and stop.
-11. On a tier-3 breach whose evidence points at a specific merged change, also
-    write a proposed reviewer eval case, as described below.
+1. 完整读取 `bands.yaml`。
+2. 确定监控指标、基线、规则、分级、动作和配置的诊断工具。
+3. 从适当监控源查询当前与相关历史数据。
+4. 依据声明的控制带评估观测数据。
+5. 若 `bands.yaml` 指定 Western Electric 规则，则应用该规则。
+6. 记录查询数据、评估时间和最终级别。
+7. 第 1 级越界时，记录越界及证据。
+8. 第 2 级越界时，仅使用 `bands.yaml` 列出的工具诊断。
+9. 记录诊断证据、假设和未解决的不确定性。
+10. 第 3 级越界时，编写新的修复 intent 提案并停止。
+11. 若第 3 级越界的证据指向特定已合并变更，同时按下述要求编写评审者 eval 提案。
 
-Do not silently change the baseline, tier definitions, or alerting configuration.
+不得默默修改基线、分级定义或告警配置。
+若无权访问监控源，报告具体不可用来源，不声称控制带健康。
 
-If monitoring access is unavailable, report the specific unavailable source and
-do not claim that a band is healthy.
+## 各级动作
 
-## Tier actions
+第 1 级越界按配置记录。不要将常规日志事件转成未经批准的生产变更。
 
-For a tier-1 breach, log it according to the configured action. Do not turn a
-routine log event into an unapproved production change.
+第 2 级越界使用配置工具清单诊断。区分诊断与修复，记录证据能证明与不能证明的内容。
 
-For a tier-2 breach, diagnose with the configured tool list. Keep diagnosis
-separate from remediation and record what the evidence does and does not prove.
+第 3 级越界创建 `.sdlc/<slug>-fix/intent.md` 作为新提案。内容基于实际监控证据，不基于猜测的根因。
+将新 intent 转交 `sdlc-plan`，通过正常人工访谈与批准门禁重新启动循环。
 
-For a tier-3 breach, create `.sdlc/<slug>-fix/intent.md` as a new proposal. Base
-the content on observed monitoring evidence, not on a guessed root cause.
+## 第 3 级 intent 提案
 
-Route this new intent to `sdlc-plan` so the normal human interview and approval
-gate starts the loop again.
+采用正常阶段 1 的 intent 结构。
+在 **Problem** 中说明越界与证据，在 **Proposed outcome** 中描述期望恢复或改善的行为。
+明确列出受影响用户和系统、运维约束及所有未解决根因问题。
+提案不代表获得修改生产环境的授权。
 
-## Tier-3 proposed intent
+## 评审者 eval 提案
 
-Use the normal Stage 1 intent structure for the new fix proposal.
+可追溯到已合并变更的越界，说明审查未发现某个缺陷。将它记录为可用于测试评审者的案例，避免同类问题再次漏审。
 
-State the breach and evidence in **Problem**. Describe the desired restored or
-improved behaviour in **Proposed outcome**.
+编写 `.sdlc/evals/reviewer/proposed/<slug>.md`，包含：变更及提交 SHA、缺陷文件与行号、用短语描述的缺陷类别、实际生产证据，以及修复方案（若已有）。对该变更运行评审者，只有以 `Important` 报告对应文件及缺陷类别，案例才算通过。
 
-List affected users and systems, operational constraints, and all unresolved root
-cause questions explicitly.
+若证据不能确定具体变更，不编写案例。在评估集中加入猜测会让后续评审得分失去意义。
+不要自行提升案例。真人确认缺陷真实存在后，才可移至 `confirmed/`；只有 `confirmed/` 中的案例构成门禁。编写提案不等于确认根因。
 
-The proposal is not authorization to change production.
+## 定期职责
 
-## Proposed reviewer eval case
+按项目已配置的计划和工具，定期执行漏洞扫描。
+若已配置对应集成，通过 Claude Tag 处理来自 Slack 或 Teams 的事件响应信号。
+将定期扫描和事件信号视为证据来源，遵循同样的控制带评估与分级动作规则。
+不得编造项目未配置的执行计划、集成、告警路由或 runbook。
 
-A breach that traces to a merged change is a defect the review passes did not
-catch. Record it where it can be used to test the reviewer, or the same class
-escapes again.
+## 禁止事项
 
-Write `.sdlc/evals/reviewer/proposed/<slug>.md` with: the change and its commit
-SHA, the file and line holding the defect, the bug class in one phrase, the
-observed production evidence, and the fix once it exists. The case passes when the
-reviewer, run against that change, reports that file and that bug class at
-`Important`.
+绝不自行实施生产修复。
+绝不合并或部署修复。
+绝不绕过人工分诊，将第 3 级提案直接转成代码。
+绝不在缺少证据时将根因当作事实。
 
-Do not write a case when the evidence does not identify a specific change. A guess
-in the eval set makes every later reviewer score meaningless.
+## 退出门禁与交接
 
-Do not promote the case yourself. A person moves it to `confirmed/` after agreeing
-the defect is real; only `confirmed/` cases gate anything. Writing a proposal is
-not confirming a root cause.
-
-## Scheduled responsibilities
-
-Run vulnerability scanning periodically according to the project's configured
-schedule and tools.
-
-Handle incident-response signals from Slack or Teams through Claude Tag when that
-integration is configured.
-
-Treat scheduled scans and incident signals as evidence sources; follow the same
-band evaluation and tier action rules.
-
-Do not invent schedules, integrations, alert routes, or runbooks that the project
-has not configured.
-
-## Prohibitions
-
-Never apply a production fix yourself.
-
-Never merge or deploy a remediation.
-
-Never bypass human triage by converting a tier-3 proposal directly into code.
-
-Never state a root cause as fact without evidence.
-
-## Exit gate and handoff
-
-On a tier-3 breach, write the proposed `.sdlc/<slug>-fix/intent.md` and stop.
-
-Human triage decides whether the intent enters the delivery loop.
-
-Hand off the new intent to `sdlc-plan`; do not proceed to design or build it.
-
-For tier-1 and tier-2 events, retain the log or diagnosis evidence and continue
-monitoring according to the configured schedule.
+第 3 级越界时，编写 `.sdlc/<slug>-fix/intent.md` 提案并停止。
+由人工分诊决定 intent 是否进入交付循环。
+向 `sdlc-plan` 交接新 intent，不继续设计或构建。
+第 1、2 级事件保留日志或诊断证据，按配置计划继续监控。

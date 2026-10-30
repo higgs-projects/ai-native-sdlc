@@ -1,3 +1,5 @@
 node_modules/
 .DS_Store
 .sdlc/tmp/
+__pycache__/
+*.py[cod]

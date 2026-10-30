@@ -1,18 +1,22 @@
-# The AI-Native SDLC Playbook
+# AI 原生 SDLC 实践指南
 
-## Thesis
+## 便携产品规划
 
-AI can produce code faster than most organizations can decide, review, and release it. That does not remove the software development lifecycle; it moves the bottleneck from typing code to expressing intent, applying policy, proving behavior, deciding risk, and learning from production.
+Plan 可先于代码仓库或 worktree 运行。当前契约在调用方指定目录产出 intent.md、prd.md、prototypes.md 和 delivery-plan.md，统一明确评审记录在 review.json。凭据绑定确切字节并追溯决定；调用方负责认证评审人，不由工具生成批准。
 
-An AI-native SDLC therefore changes the unit of coordination. The unit is not a chat transcript or an agent session. It is a version-controlled artifact that a person and an agent can both read.
+代码工作区就绪后，Design 前校验、导入需求包，按项目策略提交。下述仓库循环保持不变，设计和实施计划仍分别设门禁。无工作区 Plan 不声称 Git hook 强制执行。参见[便携产物契约](../plugins/ai-sdlc/references/portable-artifacts.md)。存储、通知、worktree、分支、派发和部署由调用方负责。历史仓库原生的已接受 intent 继续受支持。
 
-Each stage consumes the accepted artifact from the prior stage, produces its own evidence, and stops at a named gate. Agents do the scalable work: synthesis, inspection, implementation, verification, triage, and repetition. Humans retain the judgment work: choosing outcomes, resolving ambiguity, accepting risk, approving releases, and owning production.
+## 核心理念
 
-The goal is not autonomous software delivery without people. The goal is a delivery loop in which human attention is spent on decisions rather than reconstruction and mechanical checking.
+AI 生成代码的速度超过多数组织决定、审查和发布的速度。这不消除软件生命周期，而是将瓶颈从敲代码移到表达意图、落实策略、证明行为、决定风险和生产学习。
 
-This repository implements the ideas in [Anthropic's AI-Native SDLC playbook](https://claude.com/blog/the-ai-native-sdlc-playbook) as a concrete artifact contract.
+因此 AI 原生 SDLC 改变协作单元：不是聊天记录或 Agent 会话，而是真人与 Agent 都可读取的版本化产物。
+每阶段读取上游已接受产物，产生自身证据，停在指定门禁。Agent 执行可规模化工作：归纳、检查、实现、验证、分诊和重复。真人保留判断：选择结果、澄清歧义、接受风险、批准发布及负责生产。
 
-## The loop
+目标不是无人交付，而是让真人注意力花在决定上，不花在重建背景和机械检查上。
+本仓库将 [Anthropic AI 原生 SDLC 实践指南](https://claude.com/blog/the-ai-native-sdlc-playbook)落实为具体产物契约。
+
+## 循环
 
 ```mermaid
 flowchart LR
@@ -24,38 +28,34 @@ flowchart LR
     M -->|breach diagnosed| P
 ```
 
-The diagram is a loop, not a promise that every change takes the same route. A low-risk documentation correction may enter at Build. A production anomaly may enter at Maintain and create a new Plan artifact. A high-risk design may cycle between Plan and Design several times.
+图示表达循环，不保证每项变更路线相同。低风险文档修正可从 Build 进入；生产异常可从 Maintain 进入并创建新 Plan 产物；高风险设计可能多次往返 Plan 与 Design。
 
-Entering at Build is the **fast path**, and it has a shape. A person declares the change low-risk; the agent checks that declaration against the sensitive-path list in `REVIEW.md` and refuses it when the change reaches one; the declaration and that result are recorded in `plan.md`. The change then skips Stage 1 and Stage 2 and nothing else — plan review, implementation, verification, the Stage 5 passes, and a human approval all still happen. The artifact gate enforces the refusal rather than trusting the declaration, and Stage 5 re-checks the real diff, because a declared file list is a claim about work not yet done.
+从 Build 进入称为**快速路径**：真人声明低风险，Agent 对照 `REVIEW.md` 敏感路径清单检查，触及时拒绝；声明及结果记录于 `plan.md`。仅跳过阶段 1、2，仍需计划评审、实施、验证、阶段 5 审查及人工批准。门禁强制拒绝而非信任声明，阶段 5 再检查真实 diff，因为事前清单只是未完成工作的主张。
 
-The invariant is that no stage invents acceptance on behalf of the next gate owner. The fast path does not weaken it: it removes stages whose gate owner has nothing to decide, never a gate.
+不变量是任何阶段不得代替下一门禁负责人编造接受决定。快速路径仅移除负责人无须判断的阶段，不削弱门禁。
 
-Each stage is executed by one skill in the `ai-sdlc` plugin: `sdlc-plan`, `sdlc-design`,
-`sdlc-build`, `sdlc-test`, `sdlc-deploy`, `sdlc-maintain`. Two subagents serve them —
-`sdlc-reviewer` for the Stage 3 plan review, the Stage 5 review passes, and the verifier
-that judges a finding before it is posted; `sdlc-diagnostician` for Stage 6 breach
-diagnosis. The rest of this document describes the method; the skills are how it runs.
+`ai-sdlc` 的六个技能执行各阶段：`sdlc-plan`、`sdlc-design`、`sdlc-build`、`sdlc-test`、`sdlc-deploy`、`sdlc-maintain`。两个子 Agent 提供支持：`sdlc-reviewer` 负责阶段 3 计划评审、阶段 5 审查及发布前真实性复核；`sdlc-diagnostician` 负责阶段 6 越界诊断。本文描述方法，技能负责实际执行。
 
-## Operating rules
+## 运行规则
 
-1. Read the upstream artifact before doing stage work.
-2. Keep one change in one `.sdlc/<slug>/` directory.
-3. Treat artifact status as data, not decoration.
-4. Record the human approver and approval time.
-5. Do not approve an artifact you generated.
-6. Put deterministic policy in hooks or CI, not only in prose.
-7. Put repeatable institutional guidance in skills.
-8. Attach tool output as evidence; do not replace it with a claim that checks passed.
-9. Update the plan when implementation departs from it.
-10. Feed escaped defects and incidents back into tests, evals, or instructions.
-11. Review the plan before the code, where changing direction costs a paragraph.
-12. Cap the review rounds. Repeated rounds mean the approach is wrong, not that the review is working.
-13. Fix a repeated finding at its source, so the third occurrence cannot happen.
-14. Review the reviewer: its policy is configuration, and escaped defects are its eval set.
+1. 执行阶段工作前读取上游产物。
+2. 每项变更保存在一个 `.sdlc/<slug>/` 目录。
+3. 将状态视为数据，不是装饰。
+4. 记录人工批准人和时间。
+5. 不批准自己生成的产物。
+6. 确定性策略放入 hook 或 CI，不只写在文字里。
+7. 可重复使用的组织指导放入技能。
+8. 附工具输出作为证据，不用“检查通过”替代。
+9. 实施偏离计划时更新计划。
+10. 逃逸缺陷和事件反馈到测试、eval 或指导。
+11. 编码前评审计划，此时改方向只需改文字。
+12. 限制审查轮次；反复不收敛说明方案有问题。
+13. 从源头解决重复类别，防止第三次发生。
+14. 审查评审者自身：其策略也是配置，逃逸缺陷就是 eval 来源。
 
-## Where files live
+## 文件位置
 
-Per-change artifacts live together:
+每项变更产物集中保存：
 
 ```text
 .sdlc/<slug>/
@@ -65,11 +65,11 @@ Per-change artifacts live together:
 └── review-findings.md
 ```
 
-`review-findings.md` is the review's memory across rounds: which round this is, the SHA each round reviewed, every finding already posted, the pre-existing defects awaiting a human decision, and the finding classes that have now recurred. Without it a reviewer re-reads the whole change every round and reports what it reported last time.
+`review-findings.md` 是跨轮次审查记忆，记录当前轮次、各轮 SHA、已发布发现、等待真人决定的已有缺陷及重复类别。没有它，评审者会每轮重读整个变更、重复上轮发现。
 
-A fast-path change has `plan.md` and `review-findings.md` but no `intent.md` or `spec.md`, and `plan.md` carries a `## Fast path` section recording who declared it low-risk and the result of the sensitive-path check.
+快速路径有 `plan.md` 和 `review-findings.md`，没有 intent 或 spec；plan 通过 `## Fast path` 记录低风险声明人和敏感路径检查结果。
 
-Evals that protect the reviewer itself live once per repository, not per change:
+保护评审者自身的 eval 每仓库一份，不按变更重复：
 
 ```text
 .sdlc/evals/reviewer/
@@ -78,9 +78,8 @@ Evals that protect the reviewer itself live once per repository, not per change:
 └── clean/
 ```
 
-`<slug>` is a stable, short, lowercase, hyphenated change identifier. Do not reuse a slug for an unrelated change.
-
-Repository-wide operating files live at the repository root:
+`<slug>` 是稳定、简短、小写、连字符分隔的变更标识，不得复用于无关变更。
+仓库级运行文件放在根目录：
 
 ```text
 CLAUDE.md
@@ -88,51 +87,32 @@ REVIEW.md
 bands.yaml
 ```
 
-`CLAUDE.md` gives every session the same commands, architecture, conventions, and recurring corrections. `REVIEW.md` defines the review passes, severity threshold, exclusions, and evidence standard. `bands.yaml` defines deterministic production signals and the maximum action allowed at each response tier.
+`CLAUDE.md` 为会话提供统一命令、架构、约定和重复纠正。`REVIEW.md` 定义审查项、严重程度阈值、排除项和证据标准。`bands.yaml` 定义确定性生产信号及各响应级别允许的最大动作。
 
-If Jira, ServiceNow, Figma, or another platform remains the official record, each Markdown artifact must name that record and the external record must contain the commit SHA or pull-request link. One system is authoritative for each fact, and cross-links are mandatory when two systems carry working copies.
+若 Jira、ServiceNow、Figma 等仍是正式记录系统，每项 Markdown 必须指出记录，外部记录须包含提交 SHA 或 PR 链接。每个事实只有一个权威来源，两个系统持有工作副本时必须双向关联。
 
-## Stage 1: Plan
+## 阶段 1：Plan 需求规划
 
-### What it is for
+### 用途
 
-Plan captures a problem before it is diluted by tickets, meetings, and handoffs.
+Plan 在问题被工单、会议和交接稀释前捕获它，记录当前做不到什么、期望可观测结果、影响对象及不可改变的边界。
+它是初步规格，描述结果，不过早选择实现。
+想法可来自真人、客户报告、事件、工单、定期扫描或控制带越界，均使用相同产物结构，让 Design 获得稳定输入。
 
-It records what cannot be done today, what observable result is wanted, who is affected, and which boundaries cannot move.
+### Agent 职责
 
-Plan is deliberately a proto-specification.
+用易懂语言访谈提出者，询问受影响用户、当前与期望行为、约束、排除项、证据和未决问题。
+对“更好”“更快”“安全”等含糊成功标准追问，直到获得可观测描述。
+起草并指出矛盾，不决定想法是否值得做。
 
-It describes the outcome without prematurely choosing implementation.
+### 真人职责
 
-An idea can originate with a person, a customer report, an incident, a ticket, a scheduled scan, or a control-band breach.
+提出者纠正误解；产品负责人检查问题真实、结果有价值、范围一致。
+约束需解释时咨询策略负责人。产品负责人接受或拒绝 intent。
 
-Every origin uses the same artifact shape so Design receives a stable input.
+### 契约产物：`.sdlc/<slug>/intent.md`
 
-### Agent responsibility
-
-The agent interviews the originator in plain language.
-
-It asks about affected users, present behavior, desired behavior, constraints, exclusions, evidence, and unresolved questions.
-
-It challenges vague success language such as "better," "faster," or "secure" until the originator supplies something observable.
-
-It writes the draft and points out contradictions.
-
-It does not decide whether the idea is worth doing.
-
-### Human responsibility
-
-The originator corrects misunderstandings.
-
-The product owner checks that the problem is real, the proposed outcome is valuable, and the scope is coherent.
-
-Policy owners are consulted when a constraint needs interpretation.
-
-The product owner accepts or rejects the intent.
-
-### Contract artifact: `.sdlc/<slug>/intent.md`
-
-Use this template verbatim:
+严格使用以下模板：
 
 ```markdown
 # Intent: [feature name]
@@ -159,67 +139,44 @@ Author: [name]. Status: draft.
 [unresolved items]
 ```
 
-### Gate condition
+### 门禁条件
 
-The gate opens only when the product owner changes `Status` to accepted in a reviewed commit.
+只有产品负责人在经评审提交中将 `Status` 改为 accepted 才放行。
+产物须明确受影响用户、可观测结果、实质约束和未决问题。
+接受后开始 Design；拒绝则关闭变更，保留历史。
 
-The artifact must identify an affected user, an observable outcome, material constraints, and explicit open questions.
+### 防范的失败模式
 
-Acceptance starts Design.
+防止用看似合理的实现替代缺失问题陈述；也防止意图经多次人工交接不断改写，最终工程接收到的已不同于提出者本意。
 
-Rejection closes the change without deleting its history.
+### 证据与有用信号
 
-### Failure mode prevented
+Git 记录首次提交、修订、作者和接受提交。衡量最早聊天或工单到 intent 提交时间、进入 Design 的接受比例，以及首次 spec 后的修改；后期修改可能说明捕获薄弱，也可能是真实新发现。
 
-This gate prevents a plausible implementation from becoming a substitute for a missing problem statement.
+## 阶段 2：Design 技术设计
 
-It also prevents intent from being rewritten through successive human handoffs until engineering receives something different from what the originator meant.
+### 用途
 
-### Evidence and useful signals
+将已接受 intent 转为需求和可实施系统设计，在调整仍便宜时落实最新品牌、安全、合规、无障碍、架构及用户体验策略。
+需求与设计放在一起，减少转译损失。
+Spec 说明系统必须做什么、保留哪些质量、如何适配现有系统，以及未解决疑虑。
 
-Git records the initial commit, revisions, author, and acceptance commit. Measure time from the first recorded conversation or ticket to committed intent, the share accepted into Design, and edits made after the first specification commit; late edits reveal weak capture or genuine discovery.
+### Agent 职责
 
-## Stage 2: Design
+阅读已接受 intent 和相关仓库背景，加载适用组织技能并列出标准。
+提出新架构前检查当前架构。识别冲突、含糊需求、迁移风险、数据暴露和不可逆决定。
+编写可转为测试或 eval 的验收条件，不默默替冲突策略做选择。
 
-### What it is for
+### 真人职责
 
-Design converts accepted intent into requirements and an implementable system design.
+产品负责人确认 spec 仍解决已接受问题；技术负责人确认可行性和系统适配。
+指定策略负责人解决冲突。
+高风险变更批准前，架构、安全、隐私或合规负责人参与。
+产品负责人记录最终批准。
 
-It applies current brand, security, compliance, accessibility, architecture, and user-experience policy while choices are still cheap to change.
+### 契约产物：`.sdlc/<slug>/spec.md`
 
-Requirements and design live together because separating them invites translation loss.
-
-The specification states what the system must do, which qualities it must preserve, how the design fits the existing system, and which concerns remain unresolved.
-
-### Agent responsibility
-
-The agent reads the accepted intent and relevant repository context.
-
-It loads applicable organizational skills and names the standards it applied.
-
-It inspects the current architecture before proposing a new one.
-
-It identifies conflicts, ambiguous requirements, migration hazards, data exposure, and irreversible decisions.
-
-It writes acceptance criteria that can later become tests or eval checks.
-
-It does not silently choose between conflicting policies.
-
-### Human responsibility
-
-The product owner verifies that the specification still solves the accepted problem.
-
-The technical owner verifies feasibility and system fit.
-
-Named policy owners resolve flagged conflicts.
-
-For high-risk changes, the architect, security owner, privacy owner, or compliance owner joins before approval.
-
-The product owner records the final approval.
-
-### Contract artifact: `.sdlc/<slug>/spec.md`
-
-Use this template verbatim:
+严格使用以下模板：
 
 ```markdown
 # Specification: [feature name]
@@ -253,65 +210,48 @@ Use this template verbatim:
 - Extension: [none, or named extension contract]
 ```
 
-### Gate condition
+### 门禁条件
 
-The gate opens only when blocking questions are resolved, requirements are testable, policy conflicts have named decisions, and the product owner records approval in a reviewed commit.
+阻塞问题已解决、需求可测试、策略冲突有明确决定责任人，且产品负责人在经评审提交中记录批准，才可放行。
+高风险还需指定技术或策略负责人批准。
+批准后进入 Build 的只读计划模式。
 
-High-risk classifications also require the designated technical or policy owner.
+### 防范的失败模式
 
-Approval starts Build in read-only plan mode.
+防止代码和测试已体现错误决定后，才在最终审查发现策略。
+防止 Agent 将含糊结果直接转成大型 diff，也防止下游工程师从同一 intent 推导不同需求。
 
-### Failure mode prevented
+### 证据与有用信号
 
-This gate prevents policy from being discovered during final review, after code and tests already embody the wrong decision.
+Git 记录 intent、spec 提交、标准版本、评审人和批准。
+衡量 intent 接受到 spec 批准的耗时，以及首次构建计划提交后的 spec 提交数。
+后期返工分类为新发现、需求遗漏或策略冲突。
 
-It prevents an agent from converting an ambiguous outcome directly into a large diff.
+## 阶段 3：Build 构建实现
 
-It also prevents downstream engineers from inferring different requirements from the same intent.
+### 用途
 
-### Evidence and useful signals
+编辑仓库前选择具体实施路径。书面计划使文件范围、顺序、风险、证明方式和可并行工作对评审者可见。
+先规划，让架构评审发生在只需修改 Markdown、不必撤回代码的时候。因此计划在工程师查看前，由 `REVIEW.md` 指定评审者审查。轮次规则与阶段 5 一致，三轮仍不收敛就重新考虑方案。
+此时发现缺陷只需改一段；阶段 5 才发现则需提交、审查和复审。作者是 Agent 时，人几秒能回复的评论也可能变成完整循环。
+批准后，Agent 实施满足 spec 的最小完整变更。
 
-Git records the intent commit, specification commit, standards version, reviewers, and approval. Measure elapsed time from accepted intent to approved specification and count specification commits after the first build-plan commit. Classify late rework as new discovery, missed requirement, or policy conflict.
+### Agent 职责
 
-## Stage 3: Build
+先读 intent、spec、`CLAUDE.md` 和相关代码。规划期间不修改源码。
+列出每个预期新增或修改文件、顺序、迁移步骤、风险、证明命令和可能偏差。
+影响可逆性或风险时解释未采用方案。
+批准后实施、逐步测试；现实改变路径时更新计划。
 
-### What it is for
+### 真人职责
 
-Build chooses a concrete implementation route before editing the repository.
+工程师质询计划：哪里会坏、哪步风险最大、哪些假设未验证、为何放弃其他方案。
+确认其他工程师无需聊天记录也能执行。
+批准计划并评估后续偏差。
 
-The written plan makes file scope, sequencing, risks, proof, and possible parallel work visible to reviewers.
+### 契约产物：`.sdlc/<slug>/plan.md`
 
-Planning first keeps architecture review at the point where changing direction means editing Markdown rather than reverting code. So the plan is reviewed there, before the engineer sees it, by the reviewer `REVIEW.md` names for this stage. The same round rules apply as at Stage 5, and three rounds on a Markdown plan means the approach needs rethinking rather than another fix.
-
-A defect caught here costs a paragraph. The same defect caught at Stage 5 costs a commit, a round, and a re-review — and when the author is an agent, a comment a person would answer in seconds instead buys a whole cycle.
-
-After approval, the agent implements the smallest coherent change that satisfies the specification.
-
-### Agent responsibility
-
-The agent starts by reading intent, specification, `CLAUDE.md`, and relevant code.
-
-While planning, it does not modify source files.
-
-It names every expected file creation or edit, the order of work, migration steps, risks, proof commands, and likely deviations.
-
-It explains rejected alternatives where the choice affects reversibility or risk.
-
-After approval, it implements, tests incrementally, and updates the plan whenever reality changes the route.
-
-### Human responsibility
-
-The engineer interrogates the plan.
-
-They ask what can break, which step is riskiest, what assumptions are unverified, and why rejected options were rejected.
-
-They confirm that a different engineer could execute the plan without the chat transcript.
-
-They approve the plan and assess any later deviation.
-
-### Contract artifact: `.sdlc/<slug>/plan.md`
-
-Use this template verbatim:
+严格使用以下模板：
 
 ```markdown
 # Plan: [feature name] (from intent.md [date])
@@ -334,65 +274,47 @@ Use this template verbatim:
 None.
 ```
 
-### Gate condition
+### 门禁条件
 
-The gate opens only when an engineer records approval and the plan covers files, sequence, risk, and proof.
+工程师记录批准，且计划覆盖文件、顺序、风险和证明，才可放行。
+计划仍为 Draft 时不实施。
+实质偏离记录于 `Deviations`，合并前评审。
 
-No implementation begins while the plan is Draft.
+### 防范的失败模式
 
-A material departure is written under `Deviations` and reviewed before merge.
+防止设计决定只存在私有会话或个人脑中；防止首个可审查对象已是架构调整昂贵的完整 diff；通过明确文件限制意外范围扩张。
 
-### Failure mode prevented
+### 证据与有用信号
 
-This gate prevents design decisions from remaining inside a private session or a single engineer's head.
+计划批准提交记录选定路径和负责人。
+衡量首次实现即合并占比、计划批准到合并时间、返工循环，以及最终 diff 是否匹配计划。
+不靠隐藏计划变化优化首次通过率。
 
-It prevents the first reviewable object from being a finished diff whose architecture is already expensive to change.
+## 阶段 4：Test 测试验证
 
-It also limits accidental scope expansion by making expected files explicit.
+### 用途
 
-### Evidence and useful signals
+真人审查前，为实施会话提供快速、确定性反馈，并回归验证引导 Agent 的配置。
+代码测试回答产品行为是否正确；Agent eval 回答 `CLAUDE.md`、技能、hook、提示词、工具或模型变化后是否保持预期行为。二者都应进入 CI。
 
-The plan approval commit records the chosen route and owner. Measure the share of changes that merge after the first implementation pass, plan approval to merged pull request, rework cycles, and whether the final diff matches the plan. Do not optimize first-pass rate by hiding plan changes.
+### Agent 职责
 
-## Stage 4: Test
+按适用范围执行构建、测试、lint、类型、安全和视觉检查。
+修缺陷时，先用测试复现并确认因预期原因失败。
+修代码，不削弱已有证据。
+记录原始命令结果，映射到计划 Proof。
+事件或重复 Agent 错误暴露缺失案例时增加 eval。
 
-### What it is for
+### 真人职责
 
-Test gives the implementing session a fast, deterministic feedback loop before a human reviews its output.
+工程师提供稳定、非交互的验证命令。
+代码负责人检查证据是否覆盖风险行为，不只追求绿色输出。
+QA 和领域负责人为需要判断的 eval 定义验收量表。
+团队负责失败检查，Agent 不得豁免。
 
-It also regression-tests the configuration that steers agents.
+### 契约产物：根目录 `CLAUDE.md`
 
-Code tests answer whether the product behaves correctly.
-
-Agent evals answer whether changes to `CLAUDE.md`, skills, hooks, prompts, tools, or models preserve expected agent behavior.
-
-Both belong in continuous integration.
-
-### Agent responsibility
-
-The agent runs the repository's build, test, lint, type, security, and visual checks as applicable.
-
-For a defect, it first reproduces the failure with a test and confirms the test fails for the expected reason.
-
-It fixes the code rather than weakening existing evidence.
-
-It records literal command results and maps them to the plan's proof section.
-
-It adds an eval when an incident or recurring agent mistake reveals a missing case.
-
-### Human responsibility
-
-The engineer makes verification runnable with stable, non-interactive commands.
-
-The code owner reviews whether the evidence covers the risky behavior rather than merely producing green output.
-
-QA and domain owners define eval tasks where judgment must be encoded as an acceptance rubric.
-
-The team owns failed checks; the agent is not permitted to waive them.
-
-### Contract artifact: root `CLAUDE.md`
-
-Use this template verbatim:
+严格使用以下模板：
 
 ```markdown
 # [Service name]
@@ -413,155 +335,109 @@ Use this template verbatim:
 [common mistakes to avoid]
 ```
 
-Each eval case contains a task prompt, expected outcome, deterministic grader or explicit rubric, fixture version, and origin such as an incident ID.
+每个 eval 包含任务提示词、预期结果、确定性评分器或明确量表、fixture 版本，以及事件 ID 等来源。
 
-### Gate condition
+### 门禁条件
 
-The gate opens only when required deterministic checks pass, verification evidence is attached to the pull request, and agent-configuration changes meet the eval threshold.
+必需确定性检查通过、PR 附验证证据、Agent 配置变化达到 eval 阈值，才放行。
+修复期间修改测试需评审者明确关注，或由修复模式 hook 阻止。
+不稳定检查通过经评审流程隔离，不能默默重跑到绿。
 
-Test changes made during a fix receive explicit reviewer attention or are blocked by a fix-mode hook.
+### 防范的失败模式
 
-Flaky checks are quarantined through a reviewed process, never silently rerun until green.
+防止代码生成加速后后期 QA 成为新瓶颈，防止 Agent 无工具证据就宣布成功，防止提示词、技能、hook、模型或工具变化悄然造成未来回归。
 
-### Failure mode prevented
+### 证据与有用信号
 
-This gate prevents late QA from becoming the next bottleneck after code generation accelerates.
+证据来自 CI 日志。衡量首次 CI 成功率、审查时间、变更失败率、eval 通过率、事件到 eval 时间，以及 CI 与生产捕获的回归。
+只有套件包含真实、有区分力案例，高通过率才有意义。
 
-It prevents agents from declaring success without tool evidence.
+## 阶段 5：Deploy 审查交付
 
-It prevents a prompt, skill, hook, model, or tool change from silently regressing future work.
+### 用途
 
-### Evidence and useful signals
+一致执行审查，保留职责分离，强制生产边界。
+实施 Agent 可准备 PR、处理发现、组装发布材料、报告状态，不能自批 PR 或自行授权生产部署。
+人工评审从平均阅读每行生成代码，转向判断意图、风险、证据和重要发现。
 
-CI logs are the evidence source. Measure first-pass CI success, review time, change-failure rate, eval pass rate, incident-to-eval time, and regressions caught in CI versus production. High pass rates are meaningful only when the suite contains real, discriminating cases.
+### Agent 职责
 
-## Stage 5: Deploy
+独立审查依据已接受 spec 和 plan 检查 Bugs、Security 和 Compliance。
+按审查项和严重程度标记，引用精确证据，避免重复 lint 输出。
 
-### What it is for
+发布前复核发现：第二位只读评审者在独立上下文查看发现和被引用代码，不接触推理，回答失败是否真实，只判断真实性，不判断重要性。
+轮次有上限并记录；第 1 轮后仅看新 diff，不重复已发布发现，多处同类缺陷只报告一次；达到上限即返回计划。
 
-Deploy applies consistent review passes, preserves separation of duties, and enforces the production boundary.
+不是本次引入的真实缺陷以 Pre-existing 报告，不阻塞合并、不计入作者责任，但必须列出供真人决定。已有安全缺陷保留真实严重程度，照常阻塞。
+同类问题出现于两项变更后，退出前必须固化到 `CLAUDE.md`、lint 或 `REVIEW.md`。修实例不等于修类别。
 
-The implementing agent may prepare a pull request, address findings, assemble a release, and report status.
+实施 Agent 可处理评论并通过同样检查推送修复。
+发布 Agent 准备部署和回滚命令，不获取长期生产凭据。
 
-It may not approve its own pull request or authorize its own production deployment.
+### 真人职责
 
-Human review shifts from reading every generated line equally to judging intent, risk, evidence, and important findings.
+代码负责人判断是否符合 intent、残余风险是否可接受。
+发布授权人决定是否及何时部署生产。
+策略负责人评审本领域问题。
+Agent 生成的发现、评分或无发现结果，都不等于人工批准。
 
-### Agent responsibility
+### 契约产物：根目录 `REVIEW.md`
 
-An independent review pass examines bugs, security, and compliance against the accepted specification and plan.
+Anthropic 指南固定四章：`Passes`、`What Important means here`、`Cap the nits`、`Do not report`。
+本实现增加六章，保证审查收敛和可执行：`Reviewer`、`Depth`、`Sensitive paths`、`Rounds`、`Verifier`、`Fix a repeat at its source`。保留全部十个名称，各项目调整章内内容。
 
-The agent labels findings by pass and severity, cites precise evidence, and avoids repeating deterministic lint output.
+插件在 `plugins/ai-sdlc/templates/REVIEW.md` 提供完整示例，由 `ai-sdlc-init` 复制到根目录。以此为唯一权威副本，不另抄一份导致过时。
+四章涉及必须由项目明确作出、不能盲目继承的决定：
 
-A finding is verified before it is posted: a second read-only reviewer, in its own context, sees the finding and the code it cites but not the reasoning that produced it, and answers whether the failure actually happens. It judges reality, never importance.
+- `Reviewer`：指定阶段 3、5 的评审者及未安装时回退；回退始终是另行评审，不是跳过。
+- `Depth`：决定审查强度，Security 不随深度削减。
+- `Sensitive paths`：机器可检查的不可低风险清单，含 `REVIEW.md` 自身，防止快速路径清空。
+- `Rounds`：上限和收敛规则；首轮后仅增量、不重复发现、同类缺陷只报一次。
 
-Rounds are capped and recorded. After the first round the reviewer sees only the new diff, never reports a finding an earlier round posted, and reports a defect appearing at several call sites once, as a class. At the cap it stops reviewing and returns the change to its plan.
+PR、检查记录、审查发现、修复、批准、发布授权和部署日志共同构成 Deploy 产物。
 
-A real defect the change did not introduce is reported as pre-existing: it does not block merge and is not counted against the author, but it is always listed so a person decides its fate. A pre-existing security defect is reported at its real severity and blocks like any other.
+### 门禁条件
 
-A finding class that has now appeared in two changes must be encoded — in `CLAUDE.md`, a lint rule, or `REVIEW.md` — before the stage exits. Fixing the instance is not fixing the class.
+分支保护要求检查通过及代码负责人批准。
+生产 hook 要求具名、未过期、绑定被审查提交 SHA 的发布授权。
+Agent 身份不能满足上述任一批准要求。
+只为确切批准的提交和环境放行。
 
-The implementing agent may address review comments and push fixes through the same checks.
+### 防范的失败模式
 
-The release agent prepares deployment and rollback commands without acquiring standing production credentials.
+防止 Agent 规模化输出压垮非正式审查队列，防止时间压力下策略执行不一致，防止编写或修复代码的 Agent 自批或越过生产边界。
 
-### Human responsibility
+### 证据与有用信号
 
-The code owner decides whether the change matches intent and whether residual risk is acceptable.
+PR 和部署系统记录请求、发现、修复、批准、发布授权和部署时间。
+衡量首次审查时间、无需真人改分支的评论解决率、合并前与逃逸缺陷、门禁等待和进入生产的违规。
 
-The release authority decides whether and when production deployment may proceed.
+## 阶段 6：Maintain 运维反馈
 
-Policy owners review findings in their domain.
+### 用途
 
-No agent-generated finding, score, or absence of findings counts as human approval.
+将生产证据转为结构化新 intent，闭合循环。
+检测保持确定性；只有版本化规则确认越界后才调用 Agent。
+允许响应按级别扩大：记录、只读诊断、沿批准途径提出建议。
+生产信号不授予无限生产权限。
 
-### Contract artifact: root `REVIEW.md`
+### Agent 职责
 
-Anthropic's playbook fixes four sections — `Passes`, `What Important means here`,
-`Cap the nits`, `Do not report`. This implementation adds six that the review loop needs
-in order to converge and to stay enforceable: `Reviewer`, `Depth`, `Sensitive paths`,
-`Rounds`, `Verifier`, and `Fix a repeat at its source`. Keep all ten names; the content
-under them is yours to tune per project.
+诊断级别读取指标、日志、近期部署和仓库历史，说明证据、置信度、可能原因和缺失信息。
+建议级别仅在配置明确允许时，创建 PR 或调用预批准 runbook。
+为重新进入生命周期的工作编写 `.sdlc/<slug>/intent.md`。
+不改阈值、不删除告警、不自行扩大响应权限。
 
-The plugin ships a worked version at `plugins/ai-sdlc/templates/REVIEW.md`, which
-`ai-sdlc-init` copies to the repository root. It is the one authoritative copy: read it
-there rather than from a second transcription that can drift out of date.
+### 真人职责
 
-Four of those sections carry decisions a project cannot inherit and must make:
+服务负责人选择监控信号，批准基线和响应级别。
+值班工程师按立即修复、排期、说明理由后驳回进行分诊。
+事件期间，事件指挥者保留权限。
+恢复后团队将事件转为回归测试或 eval。
 
-- `Reviewer` names which reviewer runs at Stage 3 and at Stage 5, and what happens when
-  the configured one is not installed. The fallback is always a review, never a skip.
-- `Depth` sets how much review a change gets. Security never shrinks with depth.
-- `Sensitive paths` is the machine-checkable list of what can never be low-risk. It
-  includes `REVIEW.md` itself, so the list cannot be emptied on the fast path.
-- `Rounds` sets the cap and the convergence rules: diff-only after the first round, no
-  finding reported twice, a repeated defect reported once as a class.
+### 契约产物：根目录 `bands.yaml`
 
-The pull request, check runs, review findings, fixes, approvals, release authorization, and deployment log form the Deploy artifact.
-
-### Gate condition
-
-Branch protection requires passing checks and code-owner approval.
-
-The production hook requires a named, unexpired release authorization bound to the reviewed commit SHA.
-
-The agent identity cannot satisfy either requirement.
-
-The gate opens for exactly the approved commit and environment.
-
-### Failure mode prevented
-
-This gate prevents agent-scale output from overwhelming an informal review queue.
-
-It prevents inconsistent policy application under time pressure.
-
-It prevents an agent that wrote or fixed the code from approving the same work or crossing the production boundary.
-
-### Evidence and useful signals
-
-The pull-request and deployment systems record review request, findings, fixes, approvals, release authorization, and deployment timestamps. Measure time to first review, comments resolved without a person editing the branch, pre-merge versus escaped defects, gate wait time, and gate violations reaching production.
-
-## Stage 6: Maintain
-
-### What it is for
-
-Maintain closes the loop by turning production evidence into a new, structured intent.
-
-Detection remains deterministic.
-
-An agent is invoked only after a version-controlled rule identifies a breach.
-
-The permitted response grows by tier: log, diagnose read-only, then propose through an approved route.
-
-Production signals do not grant unrestricted production access.
-
-### Agent responsibility
-
-At a diagnostic tier, the agent reads metrics, logs, recent deployments, and repository history.
-
-It states evidence, confidence, plausible causes, and missing information.
-
-At a proposal tier, it may open a pull request or invoke a pre-approved runbook if the tier explicitly allows that route.
-
-It writes a new `.sdlc/<slug>/intent.md` for work that must re-enter the lifecycle.
-
-It does not alter thresholds, erase alerts, or invent a broader response authority.
-
-### Human responsibility
-
-The service owner chooses the monitored signal and approves its baseline and response tiers.
-
-The on-call engineer triages findings as fix now, schedule, or dismiss with reason.
-
-The incident commander retains authority during active incidents.
-
-The team converts the incident into a regression test or eval after recovery.
-
-### Contract artifact: root `bands.yaml`
-
-A control band is statistical, not a fixed alarm threshold. The playbook shape holds a
-metric, a rolling baseline, a rule set for deciding what counts as out-of-band, and
-escalating tiers keyed to standard deviations from that baseline:
+控制带是统计机制，不是固定告警阈值。指南结构包含指标、滚动基线、判断越界的规则集，以及按偏离基线标准差逐级升级的响应：
 
 ```yaml
 metric: [metric_name]
@@ -573,12 +449,9 @@ tiers:
   3sigma: { action: propose, routes: [pull_request, runbook:X] }
 ```
 
-The escalation is the point. One sigma is recorded and nothing else happens. Two sigma
-invokes the agent to diagnose, with an explicit tool allowlist for that band. Three sigma
-lets the agent propose a fix through a route a human controls — a pull request, or a named
-runbook. No tier deploys anything.
+关键在升级：一倍标准差仅记录；两倍标准差调用 Agent 诊断，使用该控制带明确的工具允许清单；三倍标准差允许经真人控制的 PR 或具名 runbook 提出修复。没有任何级别自行部署。
 
-A worked file for a public API:
+公开 API 的完整示例：
 
 ```yaml
 # Replace worked baselines with this service's approved SLOs.
@@ -625,38 +498,27 @@ bands:
         routes: [pull_request, runbook:checkout-regression]
 ```
 
-Absolute thresholds are a legitimate simplification for a metric with no stable baseline —
-a brand-new service, or a hard contractual SLO. Say so in a comment when you use one, so a
-reader does not mistake a fixed alarm for a control band.
+没有稳定基线的指标（如新服务或硬性合同 SLO）可合理简化为绝对阈值。使用时通过注释说明，避免把固定告警误认作统计控制带。
+每份工具列表都是允许清单，每项都必须只读；授予写工具就已不再只是监控。
 
-Every tool list is an allowlist, and every entry is read-only. A band that grants a write
-tool has stopped being monitoring.
+### 门禁条件
 
-### Gate condition
+检测器必须不依赖模型即可复现越界。
+配置级别必须允许请求动作。
+只读诊断可在沙箱自动运行。
+源码变更必须经 PR。
+生产动作仅使用预批准 runbook，并走正常生产授权。
 
-The detector must reproduce the breach without a model.
+### 防范的失败模式
 
-The configured tier must authorize the requested action.
+防止告警、工单和复盘行动无限等待真人重启开发；防止概率性诊断自行成为触发器；防止生产监控转成 Agent 的长期生产权限。
 
-Read-only diagnosis may run automatically in a sandbox.
+### 证据与有用信号
 
-Any source change goes through a pull request.
+检测日志记录指标、基线、规则、级别、越界时间、调用、输出和分诊决定。
+衡量越界到 intent 时间、转为合并修复的发现，以及同类重复事件。
 
-Any production action uses only a pre-approved runbook and the normal production authorization.
-
-### Failure mode prevented
-
-This gate prevents alerts, tickets, and postmortem actions from waiting indefinitely for a person to restart the development process.
-
-It prevents a probabilistic diagnosis from becoming its own trigger.
-
-It also prevents production monitoring from turning into standing production authority for an agent.
-
-### Evidence and useful signals
-
-The detection log records metric, baseline, rule, tier, breach time, invocation, output, and triage decision. Measure breach-to-intent time, findings that become merged fixes, and repeat incidents of the same class.
-
-## The artifact chain
+## 产物链
 
 ```text
 Problem, idea, ticket, or incident
@@ -683,49 +545,36 @@ production deployment + operational signals
 incident record or next .sdlc/<new-slug>/intent.md
 ```
 
-Each arrow is both a trigger and an accountability boundary. The artifact below the arrow may be generated automatically. The approval named beside the arrow may not be inferred automatically.
+每个箭头既是触发器，也是责任边界。箭头下的产物可自动生成，旁边标出的批准不能自动推定。
+完整产物链回答六个审计问题：
 
-The complete chain answers six audit questions:
+1. 谁提出变更，为什么？
+2. 哪些需求和策略影响了它？
+3. 实施前批准了哪条路径？
+4. 哪些证据证明它有效？
+5. 谁接受残余风险并批准发布？
+6. 生产给下一轮带来什么经验？
 
-1. Who asked for the change and why?
-2. Which requirements and policies shaped it?
-3. Which route was approved before implementation?
-4. What evidence showed that it worked?
-5. Who accepted the residual risk and release?
-6. What did production teach the next cycle?
+## 指南扩展：确定性持续生效机制
 
-## Beyond the playbook: Deterministic Loop Persistence
+原博客将 hook 用作护栏，未将其作为循环持续生效机制。循环需要在各阶段边界重新声明约束，不能假设 Agent 记得当前产物、适用技能或待确认人工门禁。
+仅靠记忆时，并行请求可能切换任务；注意力转移、边界不再重申，循环就悄然失效。
+四个独立层次防止衰退：`PreToolUse` 强制门禁，`SessionStart` 恢复阶段上下文，`UserPromptSubmit` 在有工作时说明阶段和门禁，初始化的 `CLAUDE.md` 标记块提供持久记忆。共同抵御上下文重置与并发会话造成的遗忘。
 
-The blog covers hooks as guardrails, but not as the persistence mechanism for the loop. Persistence matters because the loop must re-assert itself at every stage boundary; an agent cannot be assumed to remember the active artifact, applicable skill, or pending human gate.
+## 与传统 SDLC 的区别
 
-If the workflow relies only on agent memory, sibling requests become task switchers. Attention moves, the expected boundary is no longer restated, and the loop quietly dies.
+传统流程将文档作为专业团队交接包；本模型用小型、持续更新的产物作为人与 Agent 间的可执行上下文。
+传统需求常经多层解释；这里提出者原意成为首项版本化产物，由产品负责人纠正归纳。
+传统策略往往后期检查；这里生成 spec 时加载现行策略，编码前升级冲突。
+传统实施计划可能直到完成 diff 才公开；这里调整成本低时就评审计划。
+传统 QA 位于下游；这里每次实现都有本地反馈，CI 同时测试代码和 Agent 配置。
+传统评审依赖个人注意力和记忆；这里确定性检查去除机械噪声，`REVIEW.md` 保证一致，真人聚焦意图和实质风险。
+传统治理常是文档加定期审计；这里技能在工作时提供策略，hook 和分支规则执行硬边界，Git 保存变更与批准。
+传统维护等待真人发现、分诊、重启；这里确定性控制带触发有界诊断，将新 intent 写回同一受治理循环。
+Agent 做更多工作不意味着控制更弱；控制应更早、更可重复、更可见，并更紧密绑定动作。
 
-Four independent layers prevent that decay: `PreToolUse` hooks enforce gates, `SessionStart` restores stage context, `UserPromptSubmit` names the current stage and gate while work is active, and the initialized `CLAUDE.md` block supplies durable repository memory. Together they let the loop survive context resets and concurrent sessions.
+## 健康循环的定义
 
-## What is different from traditional SDLC
-
-Traditional SDLC often uses documents as handoff packages between specialist teams. This model uses small, live artifacts as executable context between people and agents.
-
-Traditional requirements may be written after several layers of interpretation. Here the originator's words become the first version-controlled artifact, and the product owner corrects the synthesis.
-
-Traditional design policy is often checked in a late review. Here current policy is loaded while the specification is generated, and conflicts are escalated before code.
-
-Traditional implementation planning may remain private until a reviewer sees a finished diff. Here a plan is reviewed while changing direction is still cheap.
-
-Traditional QA is a downstream stage. Here every implementation session receives a local feedback loop, while CI continuously tests both code and agent configuration.
-
-Traditional review relies on individual attention and memory. Here deterministic checks remove mechanical noise, `REVIEW.md` makes review passes consistent, and humans focus on intent and material risk.
-
-Traditional governance is frequently a policy document plus periodic audit. Here skills make policy available during work, hooks and branch rules enforce hard boundaries, and Git preserves every change and approval.
-
-Traditional maintenance waits for someone to notice, triage, and restart delivery. Here deterministic control bands invoke bounded diagnosis and write a new intent into the same governed loop.
-
-The controls are not weaker because agents do more work. They are earlier, more repeatable, more visible, and more tightly bound to the action they govern.
-
-## Definition of a healthy loop
-
-A healthy loop can be inspected without reading a private conversation. Every active change has one slug and a complete upstream chain. Every status transition names a human or deterministic check authorized to make it. Every claim of success points to tool evidence.
-
-Every production permission is bounded by environment, action, identity, and time. Every escaped failure becomes a durable improvement to code, tests, evals, skills, hooks, review policy, or control bands.
-
-Speed is useful only when the chain remains understandable. Automation is mature only when the team can explain what it may do, what stops it, where the evidence lives, and who is accountable.
+无需读取私人聊天即可检查流程。每项活动变更有唯一 slug 及完整上游链；每次状态转换注明有权作决定的真人或确定性检查；每个成功主张指向工具证据。
+生产权限按环境、动作、身份和时间限定。每个逃逸失败都应成为代码、测试、eval、技能、hook、评审策略或控制带的持久改进。
+只有产物链可理解，速度才有价值；只有团队能解释自动化可以做什么、什么阻止它、证据在哪里及谁负责，自动化才成熟。

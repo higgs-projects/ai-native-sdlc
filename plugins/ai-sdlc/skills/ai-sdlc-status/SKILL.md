@@ -1,38 +1,39 @@
 ---
 name: ai-sdlc-status
-description: Report where every in-flight change sits in the AI-native SDLC loop — furthest completed stage, git state of its artifacts, the next required human gate, and any stall. Use when the user asks "where are we", "what is the SDLC status", "which changes are waiting on me", "what gate is pending", "show in-flight changes", or runs /ai-sdlc-status. Do NOT use to set the loop up (ai-sdlc-init) or to advance a stage (sdlc-plan through sdlc-maintain).
+description: 报告每项进行中变更在 AI 原生 SDLC 循环中的位置，包括最远已完成阶段、产物的 Git 状态、下一项人工门禁和阻塞。适用于查询当前进度、SDLC 状态、哪些变更等待本人处理、待确认门禁、进行中变更，或执行 /ai-sdlc-status。不用于初始化流程（ai-sdlc-init），也不用于推进阶段（sdlc-plan 至 sdlc-maintain）。
 ---
 
-# AI-SDLC Status
+# AI-SDLC 状态查询
 
-Answer one question: for each in-flight change, what is the next human decision?
+回答一个问题：每项进行中的变更，下一步需要真人作出什么决定？
 
-## Procedure
+## 操作步骤
 
-1. Locate `.sdlc/`. If it is absent, report that the loop has not been initialized in this repository and stop. Suggest `ai-sdlc-init`.
+1. 定位 `.sdlc/`。若不存在，说明此仓库尚未初始化循环，建议使用 `ai-sdlc-init`，然后停止。
 
-2. Run the plugin's state script — it is the single source of truth for stage derivation, and the same script the `SessionStart` and `UserPromptSubmit` hooks use:
+2. 运行插件状态脚本。它是推导阶段的唯一事实来源，也是 `SessionStart` 和 `UserPromptSubmit` hook 使用的脚本：
 
    ```bash
    "${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT}}/hooks/sdlc-state.sh" --long
    ```
 
-   It emits one tab-separated row per slug: `slug`, `stage (name)`, `detail`, `next gate`. Stage is **derived** from which artifacts exist and what git says about them; there is no stored state file, so nothing can be stale. Do not reimplement this logic in the conversation — a second implementation is a second thing to get wrong.
+   每个 slug 输出一行，以制表符分隔：`slug`、`stage (name)`、`detail`、`next gate`。阶段由产物是否存在及其 Git 状态**推导**得出，不依赖持久状态文件，因此不会出现状态文件过时的问题。不要在会话中重新实现这套逻辑，避免多份实现产生偏差。
 
-   If the script is unavailable, say so, then fall back to deriving the same thing by hand: `intent.md` present but uncommitted means Stage 1 awaiting acceptance; `intent.md` committed with no `spec.md` means Stage 1 done; and so on through `spec.md`, `plan.md`, verification evidence, PR evidence, and merge or deployment evidence.
+   若脚本不可用，先说明，再手动按同样逻辑推导：`intent.md` 存在但未提交，表示阶段 1 等待接受；`intent.md` 已提交且无 `spec.md`，表示阶段 1 完成；再依次检查 `spec.md`、`plan.md`、验证证据、PR 证据，以及合并或部署证据。
 
-3. Add the git detail the script does not carry: for each slug, state whether its artifacts and the implementation they govern are committed, dirty, or untracked.
+3. 补充脚本未包含的 Git 细节：逐项说明产物及其约束的实现是已提交、有未提交修改，还是未跟踪。
 
-4. Flag stalls explicitly:
-   - any artifact that is uncommitted, and therefore not yet accepted;
-   - a `spec.md` whose modification time is older than the code it governs, which means the code has moved on without the spec;
-   - a `plan.md` recording deviations — look for a `## Deviations` section or unchecked deviation items;
-   - a `review-findings.md` whose last round reached the cap, which means the change is waiting on a rethink of its approach rather than on another fix;
-   - a `review-findings.md` with an unencoded row under `## Recurring`, which holds the Stage 5 exit gate;
-   - a `Pre-existing` finding with no decision recorded, which is a defect nobody has accepted or scheduled.
+4. 明确标记停滞情况：
 
-   A slug whose `plan.md` has a `## Fast path` section entered at Build with no `intent.md` or `spec.md`. That is not a stall and not a missing artifact. Say which changes took it, and name the person who declared each one low-risk — the fast path spends their judgement, so it should be visible.
+   - 产物未提交，因此尚未被接受。
+   - `spec.md` 的修改时间早于它所约束的代码，意味着代码已变化但设计未跟进。
+   - `plan.md` 记录了偏差：检查 `## Deviations` 或未勾选的偏差条目。
+   - `review-findings.md` 最后一轮已达到上限，意味着需要重新考虑方案，而不是继续逐项修复。
+   - `review-findings.md` 的 `## Recurring` 下存在未固化为规则的行，因此阶段 5 的退出门禁未满足。
+   - `Pre-existing` 问题没有记录处置决定，意味着该缺陷既未被接受，也未被安排处理。
 
-5. Print a compact table: slug, artifacts present, furthest stage, git state, next human gate, stalls.
+   `plan.md` 含有 `## Fast path` 的变更从 Build 进入，本就没有 `intent.md` 或 `spec.md`。这不是停滞，也不是缺失产物。指出哪些变更采用了快速路径，并注明由谁声明为低风险，让承担判断责任的人清晰可见。
 
-6. End with the specific files or decisions needed to move each stalled change forward. Name the person's decision, not the agent's next action — the point of this report is to show which gates are waiting on a human.
+5. 输出紧凑表格：slug、现有产物、最远阶段、Git 状态、下一项人工门禁、停滞情况。
+
+6. 最后列出推动每项停滞变更所需的具体文件或决定。写清需要真人作出的决定，而不是 Agent 的下一步操作；报告的目的是展示哪些门禁正在等待真人。

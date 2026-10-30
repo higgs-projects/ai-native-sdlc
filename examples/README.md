@@ -1,12 +1,12 @@
-# AI-native SDLC example: public API rate limiting
+# AI 原生 SDLC 示例：公开 API 限流
 
-This worked change follows the loop from a customer problem through operational learning.
+此示例从客户问题出发，贯穿循环，直到从运维中学习。
 
-1. **Plan** — [intent.md](rate-limit/intent.md) describes why anonymous clients can overwhelm the public API and the desired customer outcome.
-2. **Design** — [spec.md](rate-limit/spec.md) turns that intent into endpoint, identity, storage, and security requirements.
-3. **Build** — [plan.md](rate-limit/plan.md) lists the implementation sequence, risks, and proof before code is written.
-4. **Review** — the project reviewer runs Bugs, Security, and Compliance passes against the accepted artifacts.
-5. **Deploy** — [review-findings.md](rate-limit/review-findings.md) shows actionable review output that must be resolved or accepted by a human before release.
-6. **Maintain** — [band-breach-intent.md](rate-limit/band-breach-intent.md) shows a p99 breach becoming a new intent instead of an untracked production change.
+1. **Plan 需求规划**：[intent.md](rate-limit/intent.md) 描述匿名客户端为何可压垮公开 API，以及期望客户结果。
+2. **Design 技术设计**：[spec.md](rate-limit/spec.md) 将意图转化为端点、身份、存储和安全要求。
+3. **Build 构建实现**：[plan.md](rate-limit/plan.md) 在编码前列出实施顺序、风险和证明方式。
+4. **Review 审查**：项目评审者对照已接受产物执行 Bugs、Security 和 Compliance。
+5. **Deploy 审查交付**：[review-findings.md](rate-limit/review-findings.md) 展示可操作的发现，发布前必须解决或由真人接受。
+6. **Maintain 运维反馈**：[band-breach-intent.md](rate-limit/band-breach-intent.md) 展示 p99 越界如何形成新 intent，而非变成未跟踪的生产修改。
 
-The artifacts are deliberately specific: they document one plausible public API feature, not blanks to be filled in.
+产物刻意具体：描述一个合理的公开 API 功能，而不是待填写空表。

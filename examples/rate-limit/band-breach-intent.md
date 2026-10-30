@@ -1,24 +1,24 @@
-# Intent: investigate public API rate-limit latency regression
+# Intent: 调查公开 API 限流延迟回归
 Author: API Platform on-call. Status: draft.
 
-## Breach report
-At 2026-09-02 14:20 UTC, `public_api_p99_latency_ms` remained at 860 ms for 14 minutes after the rate-limit rollout reached 100%, crossing the tier-2 threshold of 700 ms. Error rate stayed below 0.4%. Trace samples show the added Redis quota command accounts for 390–510 ms on affected requests. The 14:05 UTC deployment is the only deploy in the breach window.
+## 越界报告
+2026-09-02 14:20 UTC，限流覆盖达到 100% 后，`public_api_p99_latency_ms` 连续 14 分钟保持 860 ms，超过 700 ms 的第 2 级阈值。错误率低于 0.4%。链路样本显示新增 Redis 配额命令在受影响请求中耗时 390–510 ms。14:05 UTC 的部署是越界窗口内唯一部署。
 
 ## Problem
-Public API customers experience latency above the approved p99 band after rate-limit enforcement, even though requests succeed.
+公开 API 请求虽然成功，但客户在启用限流后经历超过已批准 p99 控制带的延迟。
 
 ## Proposed outcome
-Identify why quota-store latency is elevated and produce a safe, measured change that returns public API p99 below 400 ms without weakening the approved 120-request limit.
+确定配额存储延迟上升原因，形成安全、可衡量的变更，使公开 API p99 恢复到 400 ms 以下，不削弱已批准的 120 次请求限额。
 
 ## Affected users and systems
-Public API consumers, gateway middleware, Redis quota cluster, API Platform dashboards, and on-call incident response are affected.
+影响公开 API 使用者、网关中间件、Redis 配额集群、API Platform 看板及值班事件响应。
 
 ## Constraints
-Do not change production enforcement, Redis topology, or feature-flag state without human incident authorization. Preserve identity hashing, header behavior, and the fail-open outage policy. Use read-only traces, Redis metrics, and deployment history during diagnosis.
+未经人工事件授权，不改变生产限流、Redis 拓扑或功能开关。保留身份哈希、响应头及故障放行策略。诊断仅使用只读链路、Redis 指标和部署历史。
 
 ## Open questions
-Is the regression caused by cross-region Redis routing, connection-pool saturation, or the sorted-set operation itself? Does only one availability zone show the elevated Redis command time?
+回归由跨区域 Redis 路由、连接池饱和还是有序集合操作导致？是否仅某个可用区的 Redis 命令耗时上升？
 
-Confidence: medium — deployment timing and trace spans strongly associate the latency with the quota call, but they do not yet distinguish network routing from Redis saturation.
+Confidence: medium — 部署时间和链路 span 强烈关联配额调用与延迟，但尚无法区分网络路由和 Redis 饱和。
 
-Evidence: dashboard window 14:20–14:34 UTC; trace samples for `/v1/public/search`; Redis command-latency dashboard; deployment record at 14:05 UTC.
+Evidence: 14:20–14:34 UTC 看板窗口；`/v1/public/search` 链路样本；Redis 命令延迟看板；14:05 UTC 部署记录。

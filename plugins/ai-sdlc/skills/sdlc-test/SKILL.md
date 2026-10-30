@@ -1,135 +1,98 @@
 ---
 name: sdlc-test
-description: Execute project verification for an implemented, planned change and report real test and applicable eval output before it can be reviewed. Do NOT use for drafting plans, implementing features, speculative test advice, PR review, merging, deployment, or monitoring.
+description: 对已按计划实施的变更执行项目验证，在进入审查前报告真实测试输出及适用的 eval 输出。不用于起草计划、实现功能、推测性测试建议、PR 审查、合并、部署或监控。
 ---
 
-# SDLC Test
+# SDLC 测试验证
 
-Run Stage 4 of 6 in the AI-Native SDLC playbook described in `docs/PLAYBOOK.md`.
+执行 `docs/PLAYBOOK.md` 所述 AI 原生 SDLC 六阶段中的第 4 阶段。
 
-## Purpose
+## 目标
 
-Prove the implementation against `plan.md` and `spec.md` before review.
+审查前，根据 `plan.md` 和 `spec.md` 证明实现。
+Agent 必须实际执行验证，绝不能仅凭源码检查、历史执行结果或假设声称测试通过。
 
-The agent must execute verification. Never claim that tests pass based on source
-inspection, an earlier run, or an assumption.
+## 进入门禁
 
-## Entry gate
+定位 `.sdlc/<slug>/plan.md`、`.sdlc/<slug>/spec.md` 及已实现代码。
+确认 `plan.md` 包含 **Proof**，`spec.md` 包含 **Verification strategy**。
+确认 spec 已接受，且存在可测试的实现。
+若任一产物、必需章节或实现缺失，返回 `sdlc-build` 并停止。
 
-Locate `.sdlc/<slug>/plan.md`, `.sdlc/<slug>/spec.md`, and the implemented code.
+`plan.md` 含有 `## Fast path` 的变更按设计没有 `spec.md`。此时要求 plan、其中的 **Proof** 和已实现代码，用快速路径声明代替 spec。其余要求不变：快速路径跳过阶段 1、2，绝不跳过验证。
 
-Verify that `plan.md` contains **Proof** and that `spec.md` contains
-**Verification strategy**.
+## 操作步骤
 
-Verify that the spec was accepted and that implementation is available to test.
+1. 完整读取 `plan.md` 的 **Proof**。
+2. 完整读取 `spec.md` 的 **Verification strategy**；快速路径改读 `## Fast path` 声明及计划范围。
+3. 将计划中的证明方式映射到 spec 的需求与验证策略；快速路径则映射到声明的范围与原因。
+4. 查找项目记录的测试命令与测试套件。
+5. 执行项目全部测试，包括适用的计划指定测试。
+6. 捕获真实命令输出、退出状态、跳过的测试与失败项。
+7. 在验证报告中引用相关真实输出。
+8. 判断变更是否修改 `CLAUDE.md`、任一技能、任一 hook、`REVIEW.md` 或评审者子 Agent 定义。评审策略和评审者本身同样是配置；若它们被削弱，循环其他部分可能无法发现。
+9. 如有此类修改，查找项目针对该配置的现有 eval 套件。
+10. 执行适用 eval，引用真实输出与退出状态。
+11. 若没有 eval 套件，明确说明未找到，不编造 eval。
+12. 将证据与计划和设计中的每项验证主张比较。
 
-If any artifact, required section, or implementation is missing, return to
-`sdlc-build` and stop.
+不得因某套件缓慢、不方便或乍看无关而省略。
+若项目要求的环境不可用，报告具体阻塞，不得将验证标为通过。
 
-A change whose `plan.md` has a `## Fast path` section has no `spec.md` by design. For
-it, require `plan.md`, its **Proof** section, and the implemented code, and read the
-fast-path declaration in place of the spec. Everything else in this stage is unchanged:
-the fast path skips Stage 1 and Stage 2, never verification.
+## Eval 评估
 
-## Procedure
+Eval 是一组固定提示词及预期行为断言，与其保护的配置一同进行版本管理。
+当 `CLAUDE.md`、技能、hook、`REVIEW.md` 或评审者定义变化时，查找并执行保护这些配置的项目 eval。
 
-1. Read `plan.md` **Proof** in full.
-2. Read `spec.md` **Verification strategy** in full, or, on the fast path, the
-   `## Fast path` declaration and the plan's stated scope.
-3. Map the planned proof to the spec's requirements and verification strategy, or on
-   the fast path to the declared scope and reason.
-4. Discover the project's documented test commands and test suites.
-5. Execute all tests in the project, including the tests named by the plan where
-   applicable.
-6. Capture actual command output, exit status, skipped tests, and failures.
-7. Quote the real relevant output in the verification report.
-8. Determine whether this change modified `CLAUDE.md`, any skill, any hook,
-   `REVIEW.md`, or the reviewer subagent definition. The review policy and the
-   reviewer are configuration like any other: a change that weakens either is a
-   change nothing else in the loop will catch.
-9. If it did, discover the project's existing eval suite for that configuration.
-10. Run the applicable eval suite and quote its actual output and exit status.
-11. If no eval suite exists, state that none was found; do not invent an eval.
-12. Compare evidence with every planned and specified verification claim.
+## 评审者自身的评估集
 
-Do not omit a suite because it is slow, inconvenient, or unrelated at first glance.
-
-If the project documents a required environment that is unavailable, report the
-specific blocker and do not mark verification green.
-
-## Evals
-
-An eval is a fixed prompt set with expected-behaviour assertions, versioned beside
-the configuration it protects.
-
-When `CLAUDE.md`, a skill, a hook, `REVIEW.md`, or the reviewer definition changes,
-find and run the project evals that guard that configuration.
-
-## The reviewer's own eval set
-
-`.sdlc/evals/reviewer/` holds the cases that protect the reviewer itself. Each case
-is one past change that escaped review, with the defect that escaped:
+`.sdlc/evals/reviewer/` 保存保护评审者自身的案例。每个案例对应一项曾漏审的历史变更及漏掉的缺陷：
 
 ```text
 .sdlc/evals/reviewer/
-├── proposed/     written by sdlc-maintain, not yet confirmed by a person
-├── confirmed/    a person agreed the defect is real; these are the eval set
-└── clean/        changes known to contain no defect
+├── proposed/     由 sdlc-maintain 编写，尚未由真人确认
+├── confirmed/    真人已确认缺陷真实存在，构成评估集
+└── clean/        已知不含缺陷的变更
 ```
 
-A case names the change, the commit that introduced the defect, the file and line,
-the bug class, and the fix. A case passes when the reviewer, run against that
-change, reports that file and that bug class at `Important`. Reporting something
-else at that location is not a pass.
+案例说明变更、引入缺陷的提交、文件与行号、缺陷类别及修复方式。对该变更运行评审者，只有它以 `Important` 报告对应文件和缺陷类别，案例才算通过；在同一位置报告其他问题不算通过。
 
-Run `confirmed/` when `REVIEW.md` or the reviewer definition changes, and keep the
-result only if it does not fall. Run `clean/` the same way: a finding there is a
-false alarm, and the rate is the noise signal in `docs/METRICS.md`.
+修改 `REVIEW.md` 或评审者定义时，运行 `confirmed/`，仅当评估表现未下降时保留变更。同样运行 `clean/`：其中的发现属于误报，其比率对应 `docs/METRICS.md` 的噪声指标。
 
-Only a person moves a case from `proposed/` to `confirmed/`. An agent never
-promotes its own case, and an unconfirmed case never gates anything.
+只有真人可将案例从 `proposed/` 移至 `confirmed/`。Agent 不能提升自己提出的案例，未经确认的案例不构成任何门禁。
+不得编造 eval 套件、预期结果或通过结果。找不到项目 eval 时明确说明。
 
-Do not invent an eval suite, expected results, or passing result. Note plainly when
-no project eval suite can be found.
+## 失败循环
 
-## Failure loop
+任一测试、必需检查或适用 eval 失败时，返回代码阶段。
+报告真实失败输出，指出失败的证明项或验证主张。
+只要必需证据失败或缺失，就不得请求审查、生成部署交接，或声称验证通过。
+修正代码后，重新执行受影响的验证及全部项目测试。
 
-If any test, required check, or applicable eval is red, return to code.
+## 必需报告
 
-Report the real failure output and identify the failed proof or verification claim.
+展示简洁的证据报告，包含：
 
-Do not ask for review, produce a deployment handoff, or call verification green
-while any required evidence is red or missing.
+- 实际执行的测试与命令。
+- 引用的真实通过或失败输出。
+- 每项相关 `Proof` 与验证策略条目的结果。
+- 配置是否发生变化。
+- 适用 eval 命令及引用结果，或未找到 eval 的事实。
 
-After code is corrected, rerun the affected verification and all project tests.
+不能用“测试通过”替代实际输出，输出本身才是证据。
 
-## Required report
+## 退出门禁
 
-Show a concise evidence report containing:
+以下条件全部满足才可继续：
 
-- The tests and commands actually executed.
-- Quoted real output for pass or failure.
-- The result of each relevant `Proof` and verification-strategy item.
-- Whether configuration changed.
-- Applicable eval commands and quoted results, or the fact that none was found.
+1. 全部项目测试通过，并引用输出。
+2. 若受保护配置变化，所有适用 eval 通过，并引用输出。
+3. Agent 明确声明：`Verification is green`（验证已通过）。
 
-Do not replace quoted output with “tests pass.” The output is the evidence.
+交接前停下并展示测试输出。
+任一条件不满足，就返回代码阶段，不请求审查。
 
-## Exit gate
+## 交接
 
-Proceed only when all of the following are true:
-
-1. All project tests pass, with quoted output.
-2. If protected configuration changed, all applicable evals pass, with quoted output.
-3. The agent explicitly states: `Verification is green`.
-
-Stop and show the test output before handing off.
-
-If any condition is false, loop back to code and do not request review.
-
-## Handoff
-
-Hand off to `sdlc-deploy` only with the complete test evidence.
-
-Include commands, quoted results, relevant eval status, and any limitations that
-were resolved before the final green result.
+只有具备完整测试证据，才向 `sdlc-deploy` 交接。
+包含命令、引用结果、相关 eval 状态，以及最终通过前已解决的限制。

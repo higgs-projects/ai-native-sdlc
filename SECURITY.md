@@ -1,76 +1,47 @@
-# Security policy
+# 安全策略
 
-## What this project is
+## 项目说明
 
-`ai-sdlc` is a plugin for Claude Code and Codex. It ships shell hooks, Markdown
-skills, agent definitions and templates. It has no runtime service, no network
-calls, and no dependencies beyond `bash`, `git` and `python3`.
+`ai-sdlc` 是适用于 Claude Code 和 Codex 的插件，提供 shell hook、Markdown 技能、Agent 定义和模板。它没有运行时服务，不发起网络调用，依赖仅包括 `bash`、`git` 和 `python3`。
 
-Two hooks can block a tool call: `artifact-gate.sh` refuses a source write that no
-approved `plan.md` covers, and `prod-guard.sh` requires explicit human
-authorization for deploy and teardown command shapes. Both are inert unless the
-repository being worked in has a `.sdlc/` directory.
+两个 hook 可以阻止工具调用：`artifact-gate.sh` 拒绝不在已批准 `plan.md` 覆盖范围内的源代码写入；`prod-guard.sh` 要求部署和拆除类命令取得明确人工授权。只有当前仓库存在 `.sdlc/` 时，两者才会生效。
 
-## What is in scope
+## 受理范围
 
-A report is in scope when it shows one of these:
+报告能够证明以下任一问题时，属于受理范围：
 
-- A way to make `artifact-gate.sh` admit a write it should refuse — in particular
-  a write to a path listed under **Sensitive paths** in `REVIEW.md` while a
-  fast-path change is active, or a write that no active plan covers.
-- A way to make `prod-guard.sh` pass a command it should hold for authorization.
-- Command injection, path traversal or unsafe interpolation in any hook, reachable
-  from a tool-call payload, a file path, a plan, or repository contents.
-- A prompt injection in reviewed content — a diff, commit message, dependency name,
-  or source comment — that causes `sdlc-reviewer` to suppress a finding, claim a
-  human gate has passed, or act on instructions found in that content.
-- Anything that causes a hook to write, delete or exfiltrate data outside the
-  repository it is invoked in.
-- A secret committed to this repository.
+- 使 `artifact-gate.sh` 放行本应拒绝的写入；特别是快速路径变更生效时，写入 `REVIEW.md` 的 **Sensitive paths** 所列路径，或写入未被任何活动计划覆盖的文件。
+- 使 `prod-guard.sh` 放行本应等待授权的命令。
+- 可通过工具调用载荷、文件路径、计划或仓库内容触达的 hook 命令注入、路径穿越或不安全插值。
+- 被审查内容（diff、提交消息、依赖名或源码注释）中的提示词注入，导致 `sdlc-reviewer` 抑制发现、声称人工门禁已通过，或执行内容中的指令。
+- 导致 hook 在调用所在仓库之外写入、删除或外传数据的行为。
+- 提交到本仓库的秘密信息。
 
-## What is not in scope
+## 不受理范围
 
-- **Hooks are not a security boundary on their own.** They are a guardrail against
-  an agent acting outside an approved plan, not a sandbox. `prod-guard.sh` matches
-  common command shapes and can be worked around by a determined operator who
-  rewrites the command. The real controls are IAM, RBAC, branch protection, deploy
-  approvals and sandboxing; the plugin says so in its own documentation. A report
-  that a hook can be bypassed by someone who already has shell access and intends
-  to bypass it describes the design, not a defect.
-- A finding that requires modifying the plugin's own files on disk first.
-- A missing control in a repository that has not run `/ai-sdlc-init`, since every
-  hook is inert without `.sdlc/`.
-- Anything in a consuming project's own `REVIEW.md`, `bands.yaml` or `CLAUDE.md`,
-  which that project owns.
+- **Hook 本身不是安全边界。** 它用于防止 Agent 超出已批准计划行动，并非沙箱。`prod-guard.sh` 匹配常见命令形式，有意绕过的操作者可以改写命令规避。真正的控制是 IAM、RBAC、分支保护、部署审批和沙箱；插件文档也明确说明这一点。已有 shell 权限且有意绕过 hook 的报告，描述的是设计边界，不是缺陷。
+- 必须先修改磁盘上的插件自身文件才能触发的问题。
+- 未运行 `/ai-sdlc-init` 的仓库缺少控制，因为没有 `.sdlc/` 时所有 hook 均不生效。
+- 使用方项目自己拥有的 `REVIEW.md`、`bands.yaml` 或 `CLAUDE.md` 中的问题。
 
-## Reporting a vulnerability
+## 报告漏洞
 
-Report privately through GitHub Security Advisories:
+请通过 GitHub Security Advisories 私下报告：
 
 **<https://github.com/ghiaog123/ai-native-sdlc/security/advisories/new>**
 
-Please do not open a public issue for a vulnerability, and do not include real
-credentials in a report.
+请不要为漏洞创建公开 issue，也不要在报告中包含真实凭据。
 
-Include what you have: the hook or skill involved, the payload or repository state
-that triggers it, what you expected to happen, and what happened instead. A minimal
-repository that reproduces the problem is the most useful thing you can send, since
-every hook's behaviour depends on the `.sdlc/` state around it.
+请提供已掌握的信息：相关 hook 或技能、触发载荷或仓库状态、预期行为和实际行为。最有帮助的是能复现问题的最小仓库，因为各 hook 的行为依赖其周围的 `.sdlc/` 状态。
 
-## What to expect
+## 响应预期
 
-Acknowledgement within 7 days. An assessment, with a severity and a fix or a
-rejection with reasons, within 30 days.
+7 天内确认收到；30 天内完成评估，给出严重程度及修复方案，或说明不受理原因。
 
-This is a volunteer-maintained project with no paid support and no bug bounty.
-Timelines are a good-faith commitment, not a contractual guarantee.
+本项目由志愿者维护，不提供付费支持或漏洞赏金。上述时间是善意承诺，不构成合同保证。
 
-Fixes land through the project's own loop: a confirmed report becomes an
-`intent.md`, and the change carries a regression check in
-`plugins/ai-sdlc/hooks/` that fails if the defect returns. Credit is given in the
-advisory unless you ask otherwise.
+修复遵循项目自身流程：已确认报告转为 `intent.md`，并在 `plugins/ai-sdlc/hooks/` 增加回归检查，缺陷重现时检查失败。除非报告者另有要求，否则在公告中署名致谢。
 
-## Supported versions
+## 支持版本
 
-The latest commit on `main` is supported. There are no maintained release
-branches, so please confirm a finding against `main` before reporting.
+支持 `main` 上的最新提交，不维护发布分支。报告前请先在 `main` 确认问题。

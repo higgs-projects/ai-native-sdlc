@@ -1,197 +1,139 @@
 ---
 name: sdlc-build
-description: Convert an accepted .sdlc/feature-slug/spec.md into a reviewed, engineer-approved plan.md and then implement it in the accepted order. Also the entry point for the fast path, when a person declares a change low-risk and it enters at Build with no intent.md or spec.md. Do NOT use for unapproved specifications, for a change the sensitive-path list covers, independent architecture review, test sign-off, PR review, merging, deployment, or production monitoring.
+description: 将已接受的 .sdlc/feature-slug/spec.md 转化为经过评审、由工程师批准的 plan.md，再按批准顺序实施。也作为快速路径入口：真人声明变更为低风险时，可不经 intent.md 和 spec.md 直接进入 Build。不用于未批准的设计、涉及敏感路径的快速路径变更、独立架构审查、测试签字、PR 审查、合并、部署或生产监控。
 ---
 
-# SDLC Build
+# SDLC 构建实现
 
-Run Stage 3 of 6 in the AI-Native SDLC playbook described in `docs/PLAYBOOK.md`.
+执行 `docs/PLAYBOOK.md` 所述 AI 原生 SDLC 六阶段中的第 3 阶段。
 
-## Purpose
+## 目标
 
-Work in two distinct phases: create an approved engineering plan, then implement
-the approved plan.
+分为两个独立阶段：先形成已批准的工程计划，再实施该计划。
+`plan.md` 是实施契约，不是可有可无的备注。
 
-`plan.md` is the contract for implementation. Do not treat it as optional notes.
+## 进入门禁
 
-## Entry gate
+定位并完整读取 `.sdlc/<slug>/spec.md`。
+仅在 spec 存在且声明 `Status: accepted` 时继续。
+若 spec 缺失、为草稿或尚未批准，转交 `sdlc-design` 并停止，除非采用下述快速路径。
+阶段 A 不得开始修改代码。
 
-Locate `.sdlc/<slug>/spec.md` and read it completely.
+导入需求包不能跳过此门禁。读取已接受的本地 spec、其 PRD 与原型引用及评审证据。技术设计批准与下述工程计划批准是不同的决定。保留确切评审版本；若实施需要改变产品或设计语义，交回相关评审人。
 
-Proceed only when the spec exists and declares `Status: accepted`.
+## 快速路径
 
-If the spec is absent, draft, or unapproved, route to `sdlc-design` and stop —
-unless the change enters on the fast path below.
+本流程允许低风险变更从 Build 进入，规则如下。
+只有真人声明为低风险，变更才能采用快速路径。Agent 不得自行作此判断；它负责检查声明，也可以拒绝快速路径。
 
-Do not begin code changes during Phase A.
+收到声明后，在写入任何内容之前：
 
-## Fast path
-
-The playbook already allows a low-risk change to enter at Build. This is how.
-
-A change takes the fast path only when a person declares it low-risk. The agent
-never makes that call; it checks the declaration and can refuse it.
-
-On a declaration, before writing anything:
-
-1. Read the **Sensitive paths** list in `REVIEW.md`. If that file or that list is
-   absent, there is no fast path: route to `sdlc-plan` and stop.
-2. Compare every file the change will touch against that list.
-3. If any file matches, refuse the fast path, name the matching path, and route to
-   `sdlc-plan`. A declaration does not override the list.
-4. If none matches, write `.sdlc/<slug>/plan.md` with a `## Fast path` section
-   immediately above `## Files that change`:
+1. 阅读 `REVIEW.md` 的 **Sensitive paths** 列表。文件或列表缺失时，不能使用快速路径：转交 `sdlc-plan` 并停止。
+2. 将变更会触及的每个文件与该列表比较。
+3. 任一文件匹配时，拒绝快速路径，指出匹配路径，并转交 `sdlc-plan`。低风险声明不能覆盖敏感路径规则。
+4. 均不匹配时，编写 `.sdlc/<slug>/plan.md`，在 `## Files that change` 之前紧邻添加 `## Fast path`：
 
    ```markdown
    ## Fast path
-   Declared low-risk by: [person]. Reason: [why].
-   Sensitive-path check: no file in `REVIEW.md` **Sensitive paths** is touched.
+   Declared low-risk by: [声明人]. Reason: [原因].
+   Sensitive-path check: 未触及 `REVIEW.md` 的 **Sensitive paths** 中任何文件。
    ```
 
-Add that heading only to a fast-path plan. The artifact gate reads it from the
-committed plan, and while it is present every sensitive path is closed to this
-change — an ordinary plan carrying it would block its own work. When a change is
-re-routed to `sdlc-plan`, remove the section.
+仅对快速路径计划添加此标题。产物门禁从已提交计划中读取该标题；只要它存在，本变更就不得触及任何敏感路径。普通计划误带此标题会阻止自身实施。变更转回 `sdlc-plan` 时删除该节。
 
-A fast-path change skips Stage 1 and Stage 2. It skips nothing else. It still gets
-the Plan review below, the full Build and Test stages, the Stage 5 review passes,
-and a human approval on the PR.
+快速路径仅跳过阶段 1 和阶段 2，其余不变：仍需下述计划评审、完整 Build 与 Test 阶段、阶段 5 审查，以及 PR 的人工批准。
+声明的文件清单只是主张，不是事实。`sdlc-deploy` 会再次以真实 diff 核查敏感路径；触及敏感路径会撤销快速路径资格。
 
-The declared file list is a claim, not a fact. `sdlc-deploy` checks the real diff
-against the sensitive-path list again, and a diff that reaches one revokes the fast
-path.
+## 阶段 A：访谈与计划
 
-## Phase A: interview and plan
+1. 阅读已接受的 spec，包括需求、非目标、疑虑和验证策略。快速路径没有 spec，改为读取 `## Fast path` 声明，将其中原因与范围作为计划必须满足的要求。
+2. 就拟采用的方案访谈工程师。
+3. 询问预期使用的工具或库及原因。
+4. 询问所有预期修改、新增或删除的文件。
+5. 询问实施顺序及步骤间依赖。
+6. 询问风险、迁移、兼容性及回滚问题。
+7. 询问如何证明每项需求及非目标边界。
+8. 使用必需模板编写 `.sdlc/<slug>/plan.md`。
+9. 按下述要求，在工程师查看前评审计划。
+10. 向工程师展示完整计划及评审发现。
+11. 停下等待明确批准，批准前不编码。
 
-1. Read the accepted spec, including requirements, non-goals, concerns, and
-   verification strategy. On the fast path there is no spec: read the `## Fast path`
-   declaration instead, and treat its stated reason and scope as the requirement the
-   plan must satisfy.
-2. Interview the engineer about the proposed approach.
-3. Ask which tools or libraries the engineer expects to use and why.
-4. Ask for every file expected to change, be added, or be removed.
-5. Ask for the implementation order and dependencies between steps.
-6. Ask which risks, migrations, compatibility concerns, or rollback concerns exist.
-7. Ask how the implementation will prove every requirement and non-goal boundary.
-8. Write `.sdlc/<slug>/plan.md` using the required template.
-9. Review the plan before the engineer sees it, as described below.
-10. Show the full plan to the engineer, with the review findings beside it.
-11. Stop for explicit approval before any coding begins.
+## 计划评审
 
-## Plan review
+在调整方向还只需要修改 Markdown 时评审计划。此时发现缺陷只需改一段文字；到阶段 5 才发现，则需要提交和新一轮审查。作者 Agent 每多花一轮，就少一轮用于下一项变更。
 
-Review the plan while changing direction still means editing Markdown. A defect
-caught here costs a paragraph; the same defect caught at Stage 5 costs a commit and
-a review round, and every round an agent author spends is a round nobody spends on
-the next change.
+1. 阅读 `REVIEW.md` 为阶段 3 指定的评审者，默认是 `codex-plan-review`。
+2. 指定评审者未安装时，回退到 `sdlc-reviewer` 子 Agent 执行 `Plan` 审查，并记录回退。不能因缺少配置的评审者就跳过评审。
+3. 仅执行 `Plan` 审查。Bugs、Security、Compliance 需要代码，在阶段 5 执行。
+4. 调用时明确预算，因为外部评审者有自己的循环，不会读取本文件：仅执行 `Plan`，最多三轮；第 1 轮之后仅检查相较上一轮的变化；不重复报告 `review-findings.md` 已记录的问题；重复缺陷按类别报告一次；每条发现采用单行 `path:line — Severity — failure — fix` 格式。
+5. 在 `.sdlc/<slug>/review-findings.md` 中，以阶段 `Plan` 记录每轮结果。
+6. 达到上限后停止评审，告知工程师需要重新考虑方案本身。Markdown 计划连续审查三轮仍无法收敛，说明不只是文字问题。
+7. 若外部评审者实际执行轮数超过预算，记录真实轮数，不用预算替代事实，否则轮次指标会失去意义。
 
-1. Read the reviewer named for Stage 3 in `REVIEW.md`. The default is
-   `codex-plan-review`.
-2. If that reviewer is not installed, fall back to the `sdlc-reviewer` subagent
-   running the `Plan` pass, and record the fallback. Never skip the review because
-   the configured reviewer is missing.
-3. Run the `Plan` pass only. Bugs, Security and Compliance need code and run at
-   Stage 5.
-4. State the budget in the invocation, because an external reviewer has its own
-   loop and will not read this file: the `Plan` pass only, at most three rounds,
-   only what changed since the previous round after round 1, no finding that
-   `review-findings.md` already records, a repeated defect reported once as a
-   class, and findings in the one-line `path:line — Severity — failure — fix` form.
-5. Record each round in `.sdlc/<slug>/review-findings.md` under stage `Plan`.
-6. At the cap, stop reviewing and tell the engineer the approach itself needs
-   rethinking. Three rounds on a Markdown plan means the plan is not the problem.
-7. If the reviewer returns having run more rounds than the budget, record the real
-   number. The count is evidence about the review, and quietly writing down the
-   budget instead of what happened makes the round metrics worthless.
+外部评审者可能持续讨论直至自身收敛，而不遵守这里的预算。例如 `codex-plan-review` 的文档规定其运行至批准或僵局，并无轮次上限。此时传入预算仅是请求，不是强制限制。若相比额外深度更重视成本控制，在 `REVIEW.md` 中将阶段 3 的评审者设为 `sdlc-reviewer`：由本技能驱动轮次，可遵守上限。
 
-An external reviewer may debate to its own conclusion rather than to this budget —
-`codex-plan-review`, for one, is documented to run until it approves or deadlocks,
-with no round cap of its own. Passing the budget in the invocation is then a request,
-not a limit. Where the cost of that matters more than the extra depth, name
-`sdlc-reviewer` for Stage 3 in `REVIEW.md`: it honours the cap because this skill
-drives its rounds.
+展示计划前修复评审发现，或记录不处理的原因。工程师一并批准计划与评审发现。
+特别注意 `Files that change`：产物门禁按该清单允许源代码写入。漏项会中途阻塞实施，范围过宽会扩大门禁放行范围。
 
-Fix what the review finds before showing the plan, or record why a finding was not
-acted on. The engineer approves the plan and its findings together.
+## 必需产物
 
-Pay particular attention to `Files that change`. The artifact gate admits source
-writes from that list: a missing entry blocks the implementation mid-flight, and an
-over-broad entry widens what the gate will admit.
-
-## Required artifact
-
-Write this plan structure verbatim. Replace only bracketed content with the
-engineer's confirmed approach.
+严格保留以下计划结构和英文契约标题，仅将方括号内容替换为工程师已确认的方案，正文使用中文：
 
 ```markdown
-# Plan: [feature name] (from spec.md [date])
+# Plan: [功能名称] (from spec.md [日期])
 
 ## Files that change
-[list of affected files]
+[受影响文件清单]
 
 ## Order of work
-[numbered steps]
+[编号步骤]
 
 ## Risks
-[potential issues]
+[潜在问题]
 
 ## Proof
-[test coverage description]
+[验证覆盖说明]
 ```
 
-In **Proof**, describe verification coverage rather than writing test code. For
-example, name the unit tests and integration tests that will establish correctness.
+**Proof** 描述验证覆盖，不编写测试代码，例如说明哪些单元与集成测试将证明正确性。
+预期文件清单应足够精确，使评审者能将计划与实际修改比较。
 
-List expected files precisely enough that reviewers can compare plan to changes.
+## 阶段 A 退出门禁
 
-## Phase A exit gate
+展示计划后停止，并按以下原话询问：
 
-After showing the plan, stop and ask exactly:
+> 工程师，这份计划是否符合你的实施思路？
 
-> Engineer, does this plan match your approach?
+仅接受工程师明确批准。请求继续不等于批准；批准待定时不得实施。
+若工程师纠正计划，修订后重新确认门禁。
 
-Accept only explicit engineer approval. Do not treat a request to continue as
-approval, and do not implement while approval is pending.
+## 阶段 B：实施
 
-If the engineer corrects the plan, revise it and repeat the gate.
+仅在 `plan.md` 获得明确批准后进入阶段 B。
 
-## Phase B: implement
+1. 修改实现前，阅读并遵守项目 `CLAUDE.md`。
+2. 将 `CLAUDE.md` 作为项目记忆和指导。
+3. 将可用技能作为策略执行，不绕过它们。
+4. 尊重 hook 防护，不规避或禁用。
+5. 仅当并行会话可用、项目指导允许，且工作确实独立时使用并行会话。
+6. 按已接受顺序实施计划。
+7. 保留 spec 的非目标与未解决疑虑。
+8. 实际偏差发生时，立即记录到 `plan.md`，说明必要性及对证明方式或风险的影响。
+9. 不得默默改变选定方案、文件范围、顺序或验证方式。
 
-Begin Phase B only after explicit approval of `plan.md`.
+若偏差使计划契约失效，暂停并取得工程师指示后再继续。
+除非实际执行了测试，否则本阶段不得声称测试通过；正式验证属于阶段 4。
 
-1. Read and follow the project's `CLAUDE.md` before touching implementation.
-2. Use `CLAUDE.md` as project memory and instructions.
-3. Apply available skills as policy rather than bypassing them.
-4. Respect hooks as guardrails; do not evade or disable them.
-5. Use parallel sessions only for genuinely independent work when available and
-   permitted by project instructions.
-6. Implement the plan in its accepted order.
-7. Preserve the spec's non-goals and unresolved concerns.
-8. Record each actual deviation in `plan.md` as it happens, including why it was
-   necessary and how it affects proof or risk.
-9. Do not silently change the chosen approach, file set, order, or verification.
+## 阶段 B 退出门禁
 
-If a deviation invalidates the plan's contract, pause and seek engineer direction
-before continuing.
+代码已实现且偏差已记录后，停止并按以下原话询问：
 
-Do not claim that tests pass in this stage unless tests have actually been run;
-formal verification is Stage 4.
+> 实现是否已按计划完成？
 
-## Phase B exit gate
+只有获得确认后才进入测试。
+若工程师否认或指出未完成事项，返回已接受计划，完成或修订记录的工作后再询问。
 
-When the code exists and deviations are recorded, stop and ask exactly:
+## 交接
 
-> Is the implementation complete per the plan?
-
-Move to testing only after confirmation.
-
-If the engineer says no or identifies incomplete work, return to the accepted plan
-and complete or revise the recorded work before asking again.
-
-## Handoff
-
-Hand off `plan.md` and the implemented code to `sdlc-test`.
-
-Include actual deviations and their recorded locations in `plan.md`.
-
-Do not hand off a plan without code or code without its plan.
+向 `sdlc-test` 交接 `plan.md` 与已实现代码，包含实际偏差及其在 `plan.md` 中的记录位置。
+不得交接没有代码的计划，也不得交接没有计划的代码。

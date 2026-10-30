@@ -1,28 +1,26 @@
-# Plan: [feature name] (from intent.md [date])
+# Plan: [功能名称] (from intent.md [日期])
 
 <!--
-Write this only after the intent and specification are accepted, or on the fast path.
-Commit it before source-code writes.
+仅在 intent 和 spec 已接受后，或采用快速路径时编写。
+源代码写入前先提交计划。
 
-A fast-path change — one entering at Build with no intent.md and no spec.md — adds a
-section with the heading "## Fast path" above "Files that change", holding the name of
-the person who declared the change low-risk, their reason, and the result of the
-sensitive-path check. That heading is what the artifact gate reads, so do not add it to
-an ordinary plan: it closes every sensitive path for as long as the plan is active. See
-the sdlc-build skill for the exact wording.
+快速路径从 Build 进入，没有 intent.md 和 spec.md；在 "Files that change" 前
+添加 "## Fast path"，记录低风险声明人、声明原因和敏感路径检查结果。
+产物门禁读取该标题，因此不得将其添加到普通计划中：只要计划生效，该标题就会封闭所有敏感路径。
+确切格式参见 sdlc-build 技能。
 -->
 ## Files that change
-[list of affected files]
+[受影响文件清单]
 
 ## Order of work
-[numbered steps]
+[编号步骤]
 
 ## Risks
-[potential issues]
+[潜在问题]
 
 ## Proof
-[test coverage description]
+[测试覆盖说明]
 
 ## Deviations
-<!-- Record accepted departures from this plan as they occur; leave `None.` when there are none. -->
+<!-- 偏离计划时及时记录已接受的偏差；没有偏差时保留 `None.`。 -->
 None.

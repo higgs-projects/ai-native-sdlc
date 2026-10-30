@@ -1,127 +1,69 @@
 ---
 name: sdlc-plan
-description: Turn a raw feature idea, problem statement, or request such as “plan this feature” into a human-approved .sdlc/feature-slug/intent.md by interviewing the originator before design begins. Do NOT use for architecture design, implementation, testing, review, deployment, or monitoring work.
+description: 从问题陈述出发，共创可供人工评审的 PRD、按需 UI 原型、intent 和子需求计划。适用于需求探索、产品评审，以及尚无代码工作区时的规划。不用于技术架构、实现、独立测试、PR 审查或部署。
 ---
 
-# SDLC Plan
+# SDLC 需求规划
 
-Run Stage 1 of 6 in the AI-Native SDLC playbook described in `docs/PLAYBOOK.md`.
+执行六阶段中的第 1 阶段。定义问题和产品行为，不制定技术方案。
 
-## Purpose
+## 目标
 
-Transform a raw idea into an accepted intent artifact.
+产出易于理解、可验证的需求包，通过一次明确的人工评审统一覆盖 PRD、原型、intent 和子需求计划。
 
-Interview the originator. Establish the problem and desired outcome.
+## 进入门禁与产物位置
 
-Do not choose architecture, implementation details, tools, or solutions in this stage.
+要求提供问题陈述、已明确的产品评审人，以及由调用方选定的可写产物目录。缺失信息应澄清，绝不推定已获批准。
 
-## Entry gate
+明确选择模式：
 
-Proceed only when the user has supplied a problem statement, even if it is rough.
+- **仓库模式**：使用已存在且已初始化工作区中的 `.sdlc/<slug>/`。
+- **便携模式**：使用调用方的产物目录。不要求、创建、克隆或初始化仓库、分支或 worktree。不得声称此模式下 Git hook 会强制执行门禁。
 
-If there is no problem statement, ask for one and stop.
+两种模式均使用相同的四个文件名：`intent.md`、`prd.md`、`prototypes.md`、`delivery-plan.md`。评审凭据保存为 `review.json`。
+使用对文件系统安全的 kebab-case slug。不要写入未经指定的当前目录。
 
-If the originator declares the change low-risk — a copy fix, a documentation
-correction, a change behind a flag that is off — check the **Sensitive paths** list in
-`REVIEW.md` against the files the change would touch. When nothing matches, hand the
-change to `sdlc-build` to enter on the fast path, and stop: an interview about a typo
-spends the originator's attention on a decision they have already made. When something
-matches, say which path it is and run this stage normally. The declaration is theirs to
-make; the path check is not negotiable, and the artifact gate enforces it either way.
+只有在仓库中确实能依据已提交的 `REVIEW.md` 执行敏感路径检查时，真人声明的低风险变更才可采用现有快速路径。没有工作区或策略，就没有快速路径授权。
 
-Derive a short, filesystem-safe kebab-case `<slug>` only after the originator has
-identified the feature well enough to name it. Confirm the name when it could be
-ambiguous.
+## 查明适用策略
 
-## Procedure
+读取调用方提供的适用产品、品牌、无障碍、隐私、数据和项目指导。记录来源与版本，或说明哪些策略不可用。需求包导入工作区后，重新核查仓库专属策略。
 
-1. Read the problem statement carefully before proposing any wording.
-2. Restate the problem neutrally to confirm your understanding.
-3. Interview the originator about what users cannot do today.
-4. Ask why that inability matters to customers, operators, or the business.
-5. Ask what breaks, remains costly, or becomes risky if the work is skipped.
-6. Ask which users, systems, integrations, and teams are affected.
-7. Ask for known limitations, requirements, deadlines, compatibility needs, and
-   regulatory or operational constraints.
-8. Ask follow-up questions whenever an answer is vague, contradictory, or lacks
-   a concrete consequence.
-9. Do not turn a requested solution into an assumed problem statement. Ask for
-   the underlying user problem and outcome first.
-10. Capture unresolved facts as open questions rather than inventing answers.
-11. Synthesize the answers into `.sdlc/<slug>/intent.md` using the exact template
-    below.
-12. Show the full draft to the user, including every open question.
+## 操作步骤
 
-## Required artifact
+1. 中立地重述用户问题，明确用户、当前行为、问题影响、期望结果、约束和可衡量的验收条件。
+2. 区分已确认事实、假设和疑问。不要把用户要求的实现方式直接当作业务问题。
+3. 为需求和验收条件编号；按实际情况描述规则、权限、数据需求、主流程、异常流程，以及空白、错误和加载状态。
+4. 涉及界面时，产出可阅读的低保真 UI 原型；用户要求或有充分理由时，产出高保真或交互原型。非 UI 工作应明确说明原型不适用。不得编造已发布 URL：通过调用方的产物机制提供可渲染文件，或可访问且有版本的引用。说明哪些交互是模拟的。
+5. 提出子需求的范围、验收条件、依赖、顺序及完整功能验收场景。在任务系统 ID 尚不存在时使用稳定标识。即使只有一个交付单元，也可以表示为单个子需求。
+6. 使用 `../../templates/` 中的模板编写四项产物。用图表达关系，用表格表达精确规则和映射，用文字解释决定。
+7. 使用现有工具回读或渲染每项交付物。检查链接、版本、一致性、需求覆盖、原型状态和依赖环。
+8. 展示完整需求包和所有未解决疑虑，进行一次统一产品评审。
 
-Write this initial artifact verbatim in structure and labels. Replace only the
-bracketed content with confirmed information.
+## 必需产物契约
 
-```markdown
-# Intent: [feature name]
-Author: [name]. Status: draft.
+- `intent.md`：保留 **Problem**、**Proposed outcome**、**Affected users and systems**、**Constraints**、**Open questions** 标题、作者及明确的 draft/accepted 状态。正文保持简短并链接到 PRD，不另写一份独立 PRD。
+- `prd.md`：使用 PRD 模板，包含摘要、用户与场景、范围、业务流程、编号规则与需求、UI 引用、验收条件、约束、风险及来源和版本信息。
+- `prototypes.md`：列出原型引用、版本、必要状态、主要操作、模拟行为、评审访问方式和限制；或注明 N/A 并给出理由。
+- `delivery-plan.md`：将子需求标识映射到需求、边界、依赖、验收条件、建议顺序和端到端验收。不定义 Git 分支。
+- `review.json`：使用 [portable-artifacts.md](../../references/portable-artifacts.md) 中的版本 1 凭据契约。通过 SHA-256 绑定全部四个文件，并记录评审人、时间戳、决定和可检索的证据引用。
 
-## Problem
-[what customers cannot do today]
+仅有文档链接或文件存在不代表批准。外部原型引用必须具有不可变版本或摘要；凭据只对所包含的 Markdown 计算哈希，不覆盖可变 URL 背后的远程内容。
 
-## Proposed outcome
-[what better looks like]
+## 疑虑与人工评审
 
-## Affected users and systems
-[who and what is impacted]
+识别阻塞项与非阻塞问题，说明影响、所需决定，以及已知的责任人。不得默默消除不确定性，或替他人接受风险。
 
-## Constraints
-[limitations or requirements]
+请指定评审人批准列出的完整需求包与子需求计划，包括 intent。一次明确确认可以覆盖整个需求包，不要为每个子需求重复请求同一批准。
 
-## Open questions
-[unresolved items]
-```
+仅接受范围与确切版本清晰的答复。标记需求包为 accepted 前，解决所有阻塞项。如果以后为某个子需求创建独立需求包，其确切范围与 intent 必须已纳入统一评审；新增的子需求内容需要新的决定。
 
-Use the originator's name for `[name]` when it is known. Ask rather than infer it.
+获得明确批准后，将生命周期状态改为 accepted，保留内容，由调用方针对最终确切字节记录凭据。批准范围必须包含这一机械状态转换；任何语义修改均需重新评审。工具的 `review-request` 命令只生成**草稿**，不会批准。绝不伪造评审人身份、时间戳或证据。
 
-Keep the artifact about intent, not a proposed technical solution.
+## 交接
 
-Describe the outcome in observable terms without prescribing how to build it.
+交接需求包位置、变更 ID、产物版本与摘要、确认来源、策略来源，以及剩余非阻塞问题。
 
-## Quality loop
+仓库模式下，校验凭据并按项目策略提交已接受的产物。便携模式下，直接交接，不执行 Git 操作。调用方提供已初始化的代码工作区后，使用 `../../scripts/artifact_bundle.py` 校验并导入需求包，在进入 Design 前完成提交。
 
-Push on vague answers. For example, “make it better” does not state what a user
-cannot do now or what success looks like.
-
-Treat an empty section as a prompt to investigate, not a field to quietly omit.
-
-If constraints are empty while the request clearly has limits, ask about those
-limits and revise the draft after receiving an answer.
-
-If the originator cannot answer yet, place the issue in **Open questions**.
-
-Open questions are better than guesses. Never present an inference as a confirmed
-fact.
-
-Do not proceed to design merely because the prose sounds complete. The originator
-must explicitly approve the intent.
-
-## Exit gate
-
-After showing the draft, stop and ask exactly:
-
-> Does this intent match what you meant?
-
-Accept only an explicit human approval. Do not treat silence, a new request, a
-reaction, or a request to continue as approval.
-
-When the human explicitly approves, update the artifact status from `draft` to
-`accepted` so the next stage can verify its entry gate. Commit the accepted
-artifact with `Status: accepted` in the commit message.
-
-If approval includes corrections, revise the draft and repeat the exit question.
-
-Do not start Stage 2 before this gate is satisfied.
-
-## Handoff
-
-Hand off the accepted `.sdlc/<slug>/intent.md` to `sdlc-design`.
-
-State the artifact path and any remaining open questions in the handoff.
-
-Do not answer those questions on the originator's behalf.
+调用方负责文档存储、评审人身份与通知、任务记录、工作区创建、依赖调度和角色派发。本技能不指定任务平台、存储服务或部署平台。交接后停止。

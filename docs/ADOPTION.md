@@ -1,56 +1,45 @@
-# Adoption
+# 推广采用
 
-Adopt the workflow by increasing scope and control strength only after the prior phase produces understandable evidence.
+只有前一阶段产出可理解的证据后，才扩大流程范围和控制强度。
 
-The staged approach below applies the modular adoption principle from [Anthropic's AI-Native SDLC playbook](https://claude.com/blog/the-ai-native-sdlc-playbook) without requiring an organization-wide process change on day one.
+以下分阶段方式采用 [Anthropic AI 原生 SDLC 实践指南](https://claude.com/blog/the-ai-native-sdlc-playbook)的模块化推广原则，无需第一天就改变全组织流程。
 
-The phases are cumulative:
+各阶段逐步累积：
 
-1. One repository, one volunteer, artifacts only.
-2. One team, hooks, `REVIEW.md`, and evals in CI.
-3. Organization-wide managed settings and shared skills.
+1. 一个仓库、一名志愿者，仅使用产物。
+2. 一个团队，启用 hook、`REVIEW.md` 和 CI eval。
+3. 全组织托管设置与共享技能。
 
-Do not skip directly to centralized enforcement.
+不要直接跳到集中强制执行。团队首先要了解哪些产物改善决定、哪些控制解决真实失败。
 
-Teams must first learn which artifacts improve decisions and which controls address real failures.
+## 开始之前
 
-## Before starting
+选择交付活跃但范围可控的仓库。首次试点避开监管最严、最关键或测试最薄弱的服务。
 
-Choose a repository with active but bounded delivery work.
+明确产品负责人、工程负责人及一位愿意试用流程的志愿者。
+记录从 intent 到合并的时间、首次 CI 成功率、审查时间、返工和变更失败率的当前基线。
+约定试点评估的是流程，不是志愿者绩效。
+保留已有分支保护、安全扫描、变更管理和事件处理流程。
 
-Avoid the most regulated, most critical, or least tested service as the first trial.
+## 阶段 1：一个仓库、一名志愿者，仅使用产物
 
-Name a product owner, an engineering owner, and one volunteer who wants to use the workflow.
+### 目标
 
-Record the current baseline for intent-to-merge time, first-pass CI success, review time, rework, and change-failure rate.
+自动化门禁前，证明版本化产物链能改善共同理解。志愿者手动触发每个阶段，并等待指定真人决定。不使用 hook 阻塞工作，不改全组织设置。
 
-Agree that the trial evaluates a process, not the volunteer's performance.
+### 进入条件
 
-Keep existing branch protection, security scans, change management, and incident procedures in place.
+- 一个仓库有稳定构建和测试命令。
+- 一名志愿者有适合两到四周试点的实际工作。
+- 产品负责人可评审 intent 和 spec。
+- 工程师可批准实施计划和代码变更。
+- 团队约定 `.sdlc/<slug>/` 命名方式。
+- 已明确事实来源系统及必要链接。
+- 试点具有开始日期、复盘日期和回滚决定负责人。
 
-## Phase 1: One repository, one volunteer, artifacts only
+### 启用内容
 
-### Goal
-
-Prove that a version-controlled artifact chain improves shared understanding before automating any gate.
-
-The volunteer manually prompts every stage and stops for the named human decision.
-
-No hook blocks work and no organization-wide setting changes.
-
-### Entry criteria
-
-- One repository has a stable build and test command.
-- One volunteer has active work suitable for a two-to-four-week trial.
-- A product owner can review intent and specification artifacts.
-- An engineer can approve implementation plans and code changes.
-- The team agrees on a `.sdlc/<slug>/` naming convention.
-- Existing source-of-truth systems and required links are identified.
-- The trial has a start date, review date, and rollback decision owner.
-
-### What to turn on
-
-Create the per-change artifact directory:
+创建每项变更的产物目录：
 
 ```text
 .sdlc/<slug>/
@@ -59,97 +48,72 @@ Create the per-change artifact directory:
 └── plan.md
 ```
 
-Use the templates and gates in [PLAYBOOK.md](PLAYBOOK.md).
+使用 [PLAYBOOK.md](PLAYBOOK.md) 的模板和门禁。
+仅当仓库缺少稳定的构建、测试和约定指导时，在根目录添加简短 `CLAUDE.md`。
+手动触发 Plan、Design 和 Build。
+每个人工决定记录为经过评审的提交或 PR 决定。
+试点变更实施前必须有已批准计划。
+将每项产物关联到已有工单或变更记录。
+不添加自动状态流转，不添加生产 Agent。
 
-Add a short root `CLAUDE.md` only if the repository lacks stable build, test, and convention instructions.
+### 衡量内容
 
-Prompt Plan, Design, and Build manually.
+- 从初始想法或工单到提交 `intent.md` 的时间。
+- 从接受 intent 到批准 `spec.md` 的时间。
+- 从批准计划到 PR 合并的时间。
+- Build 开始后的 spec 变化。
+- 每项试点变更的返工循环数。
+- 评审者能否脱离原始聊天理解变更。
+- 评审者反复认为空泛、含糊或冗余的章节。
+- 志愿者与评审者维护产物的时间。
 
-Record each human decision as a reviewed commit or pull-request decision.
+每周抽取少量产物进行定性评审。当评审者用产物更早作决定，且团队能指出至少一次避免的误解或后期返工，本阶段即取得成效。
 
-Require the approved plan before implementation for trial changes.
+### 停滞时的处理
 
-Link each artifact to the existing ticket or change record.
+无法完成 intent 时，将模板缩减为问题、结果、约束和未决问题；仅在字段服务于决定时恢复。
+评审等待数天时，设定简短的评审服务预期，确认负责人有时间处理。
+spec 与工单重复时，明确唯一权威来源，另一处只引用，不维护两份完整副本。
+编码后才批准计划时，缩小工作范围；添加 hook 前先将计划作为可见的 PR 检查。
+两周后产物仍未带来有用讨论，检查实际文档，不要自动化。
+若团队说不出产物链改善了什么决定，停止试点，修订产物契约后再恢复。
 
-Do not add automated status transitions.
+### 退出条件
 
-Do not add a production agent.
+- 至少三项代表性变更完成产物链。
+- intent、spec 和 plan 均在下游工作前批准。
+- 评审者可从 Git 找到当前决定和证据。
+- 已了解产物维护成本。
+- 团队已识别值得强制执行的重复违规。
+- 没有需要改变基本流程的未决疑虑。
 
-### What to measure
+## 阶段 2：一个团队、hook、REVIEW.md 和 CI eval
 
-- Time from source idea or ticket to committed `intent.md`.
-- Time from accepted intent to approved `spec.md`.
-- Time from approved plan to merged pull request.
-- Specification changes after Build starts.
-- Rework cycles per trial change.
-- Whether reviewers can understand the change without the original chat.
-- Artifact sections that reviewers repeatedly find empty, vague, or redundant.
-- Volunteer and reviewer time spent maintaining artifacts.
+### 目标
 
-Review a small sample of artifacts qualitatively every week.
+让已验证的团队规则可重复执行，对指导 Agent 的配置做回归测试。
+自动化从团队已理解的边界开始。真人仍批准 intent、spec、plan、合并和生产发布。
 
-The phase succeeds when reviewers use the artifacts to make earlier decisions and the team can point to at least one avoided misunderstanding or late rework cycle.
+### 进入条件
 
-### What to do when stalled
+- 已满足阶段 1 退出条件。
+- 试点证据足以识别一两个高价值确定性门禁。
+- 必需 CI 检查稳定且可非交互执行。
+- 分支保护已要求 PR 和独立评审。
+- 团队能区分 Important 与 Nit。
+- 平台或仓库负责人能维护 hook 和 CI。
+- 有 20 至 50 个适合作为初始 eval 的真实 Agent 任务或事件，或已记录达到该规模的计划。
 
-If the volunteer cannot finish an intent, reduce the template to the problem, outcome, constraints, and open questions, then restore fields only when they serve a decision.
+### 启用内容
 
-If reviews wait for days, set a small review service-level expectation and confirm the named owner has capacity.
+提交根目录 `REVIEW.md`，包含四项审查：编码前对照已接受 spec 评审计划，再对照已接受产物审查 Bugs、Security 和 Compliance。同一次提交设置敏感路径、审查深度和轮次上限；这些决定审查强度，不应未经决定就沿用默认值。
 
-If the spec duplicates a ticket, declare one source authoritative and link the other instead of maintaining two complete copies.
-
-If plan approval happens after code begins, choose smaller work and make the plan a visible pull-request check before adding hooks.
-
-If artifacts add no useful conversation after two weeks, inspect the actual documents; do not automate them.
-
-Stop the trial if the team cannot name a decision improved by the chain.
-
-Revise the artifact contract before resuming.
-
-### Exit criteria
-
-- At least three representative changes completed the artifact chain.
-- Intent, specification, and plan approvals occurred before downstream work.
-- Reviewers can locate the current decision and evidence from Git.
-- Artifact maintenance cost is understood.
-- The team has identified repeated violations worth enforcing.
-- No open concern requires changing the fundamental workflow.
-
-## Phase 2: One team, hooks, REVIEW.md, and evals in CI
-
-### Goal
-
-Make proven team rules repeatable and regression-test the configuration that guides agents.
-
-Automation begins at boundaries the team already understands.
-
-Humans still approve intent, specification, plan, merge, and production release.
-
-### Entry criteria
-
-- Phase 1 exit criteria are met.
-- The team has enough trial evidence to identify one or two high-value deterministic gates.
-- Required CI checks are stable and non-interactive.
-- Branch protection already requires pull requests and independent review.
-- The team can distinguish Important findings from nits.
-- A platform or repository owner can maintain hooks and CI.
-- There are 20 to 50 real agent tasks or incidents suitable for initial eval cases, or a documented plan to grow toward that range.
-
-### What to turn on
-
-Commit root `REVIEW.md` with four passes: plan against the accepted spec before code exists, then bugs, security, and compliance against accepted artifacts. Set its sensitive-path list, review depth, and round cap in the same commit — they are the knobs that decide how much review a change gets, and leaving them at the template's defaults is a choice nobody made.
-
-Define Important, cap individual nits, and exclude generated or deterministically checked paths.
-
-Add one fast hook for a demonstrated failure, such as protected-path edits or production commands without authorization.
-
-Make every hook block explain the rule and approval route.
-
-Add CI validation that `intent.md`, `spec.md`, and `plan.md` status transitions occur in order for scoped changes.
-
-Create an eval suite from recent real tasks, repeated review findings, and incidents.
-
-Run evals when any of these change:
+定义 Important，限制 Nit，排除生成文件及确定性工具已检查的路径。
+针对已有失败添加一个快速 hook，例如受保护路径修改或未经授权的生产命令。
+每次阻止都应解释规则及审批途径。
+添加 CI 校验，保证范围内变更按顺序推进 `intent.md`、`spec.md` 和 `plan.md` 状态。
+用近期真实任务、重复审查问题和事件建立 eval 套件。
+以下配置变化时运行 eval：
 
 ```text
 CLAUDE.md
@@ -159,254 +123,205 @@ bands.yaml
 evals/**
 ```
 
-Run evals on a schedule to expose model, dependency, and environment drift.
+定期执行 eval，暴露模型、依赖和环境漂移。团队理解方差和无效案例后，才将 eval 阈值设为必需检查。
+Agent 身份不得批准 PR 或绕过分支保护。
+
+启用过期批准撤销。批准覆盖真人阅读的提交，不覆盖整个分支；否则 Agent 在批准后推送修复，就可能交付无人批准的代码。插件只提供技能、模板和 hook，不修改仓库设置，因此需自行启用。GitHub 分支规则中的设置名为 “Dismiss stale pull request approvals when new commits are pushed”，其他平台名称不同。
+
+从失败构建分诊或审查等只读任务开始使用非交互 CI。不授予长期生产凭据。
+
+### 衡量内容
+
+- 按规则统计 hook 的 allow、ask、block 数。
+- 误阻止及每道门禁损失的时间。
+- 首次审查时间及抽样评价的发现准确率。
+- 首次 CI 成功率。
+- 带案例集和配置版本的 eval 通过率。
+- 从生产事件到永久 eval 的时间。
+- CI 与生产分别捕获的回归。
+- 无需真人编辑分支、由 Agent 解决的审查评论。
+- 合并前捕获与逃逸的缺陷和漏洞。
+- 变更失败率及失败部署恢复时间。
+
+hook 和 eval 数据仅保留团队或仓库级视图，不发布个人 Agent 使用排名。
+
+### 停滞时的处理
+
+hook 阻塞合法工作时，缩小匹配范围、增加安全放行路径，扩展覆盖前测试原始误报命令。
+用户绕过 hook 时，调查控制是否过宽、过慢，或缺少合法例外途径。
+`REVIEW.md` 噪声过高时，每周评价发现，明确 Important、降低 Nit 上限，去掉 CI 已检查项。
+eval 不稳定时，固定 fixture、记录模型与工具版本、区分基础设施错误，尽可能用确定性检查替代模型评分。
+通过率始终完美时，补充真实失败和更难边界案例，不将饱和当作成功。
+CI 成本高时，PR 运行小型必需冒烟集，每夜运行全套。
+审查延迟上升时，先缩小生成 diff、拆成独立可审查变更，再增加 Agent 并发。
+团队总是立即点击批准时，暂停自动化，抽样检查批准是否对应产物质量。
+
+### 退出条件
+
+- hook 误报较低，并按稳定节奏复查。
+- 代码负责人认为 `REVIEW.md` 发现有用。
+- eval 在已知坏配置失败，在批准基线通过。
+- CI 任务的工具、身份、预算、超时和结构化输出有界。
+- 分支保护保留独立批准。
+- 新提交推送后撤销过期批准。
+- 事件关联到纠正性测试或 eval。
+- 团队能解释每道自动门禁及其证据。
+
+## 阶段 3：全组织托管设置与共享技能
+
+### 目标
+
+跨仓库扩展稳定控制和组织知识，不允许本地配置削弱不可协商边界。团队可增加更严格仓库规则及领域技能，组织负责最低标准。
+
+### 进入条件
+
+- 至少一个团队在多个交付周期中满足阶段 2 条件。
+- 安全、平台、合规和开发体验负责人认可威胁模型。
+- 每项共享策略和技能都有负责人及事实来源。
+- 已批准插件或分发渠道。
+- 能分批推广托管设置并回滚。
+- 已记录支持、例外和紧急放行流程。
+- 审计日志保留、隐私和访问规则已批准。
+- 试点指标证明控制改善流程健康，未带来不可接受摩擦。
+
+### 启用内容
+
+将必须跨仓库一致落实的策略发布为共享技能。
+服务专属命令和架构留在本地 `CLAUDE.md`。
+通过托管设置强制组织最低标准：
+
+- 禁止绕过权限。
+- 不可协商的 hook 仅来自托管配置。
+- MCP 服务和插件 marketplace 使用允许清单。
+- 数据分级要求时，沙箱失败即拒绝执行。
+- 限制网络出口和凭据暴露。
+- 强制最低受支持客户端版本。
+- 生产 Agent 无长期凭据。
 
-Make the eval threshold a required check only after the team understands variance and invalid cases.
+分批分发：平台测试、志愿团队、代表性业务单元，再全面部署。
+提供生效策略检查命令，让团队理解适用规则及原因。
+共享技能、托管配置、eval fixture 和 hook 代码均需策略负责人审查。
+执行共享核心 eval 加仓库专属 eval。
+提供已批准的非交互 CI 模式，用于只读分诊、审查、补丁建议和部署准备。
+生产发布授权仍由已有负责真人承担。
 
-Keep the agent identity unable to approve pull requests or bypass branch protection.
+### 衡量内容
 
-Turn on dismissal of stale approvals. An approval covers the commit a person read, not the branch: without this, an agent pushing a fix after your approval ships code nobody approved, and agents push fixes constantly. The plugin cannot set this — it ships skills, templates and hooks, and does not touch repository settings — so it is yours to enable. On GitHub it is "Dismiss stale pull request approvals when new commits are pushed" in the branch ruleset; other providers name it differently.
+- 使用已批准托管基线的仓库及活跃团队。
+- 策略负责人决定到共享技能版本送达团队的时间。
+- 引用已固化技能策略的审查发现。
+- 按策略版本统计拒绝和误报。
+- hook 绕过尝试及已批准例外。
+- 沙箱启动失败和被阻止的出口目标。
+- 按配置版本统计共享及本地 eval 通过率。
+- 新成员首次合并 PR 的时间。
+- 按服务类别统计 DORA 指标。
+- 进入生产的门禁违规。
+- 共享控制已覆盖类别的重复事件。
+- 支持请求量和例外解决时间中位数。
 
-Begin non-interactive CI with read-only jobs such as failed-build triage or review.
+采用群组和服务级趋势，不将采用比例本身当作价值证明。
 
-Do not grant standing production credentials.
+### 停滞时的处理
 
-### What to measure
+团队拒绝共享技能时，对照当前策略来源，去掉无法产生具体行动的通用指令。
+托管设置破坏本地构建时，暂停当前推广批次，复现拒绝原因，增加最小且经过评审的能力，不全局绕过。
+例外增多时，按根因归类，判断应修改控制、文档、工具链还是服务架构。
+策略推广缓慢时，对共享插件版本化、发布兼容说明、自动化安全分发，不要求各团队手动复制。
+团队本地分叉技能时，识别缺少的扩展点；强制核心保持集中，允许显式本地覆盖层。
+看板变成竞争排行榜时，移除个人及跨团队排名，回归服务基线和结果评审。
+集中控制引发事件时，回滚该策略批次、保留证据、增加 eval，像生产代码一样对待控制。
 
-- Hook allow, ask, and block counts by rule.
-- False-positive blocks and time lost to each gate.
-- Time to first review and review finding precision from sampled ratings.
-- First-pass CI success.
-- Eval pass rate with case-set and configuration version.
-- Production incident to permanent eval time.
-- Regressions caught in CI versus production.
-- Review comments resolved by the agent without human branch edits.
-- Defects and vulnerabilities caught before merge versus escaped.
-- Change-failure rate and failed-deployment recovery time.
+### 退出条件
 
-Keep hook and eval data at team or repository level.
+阶段 3 是持续运营状态，不是一次性完成事件。
+组织健康的表现包括：
 
-Do not publish individual agent-usage rankings.
+- 最低控制集中强制执行，本地可检查。
+- 共享技能可追溯到有负责人的策略。
+- 团队可申请并获得有界例外。
+- 配置变更经过 eval 和分批发布。
+- 生产权限与生成权限分离。
+- 指标显示返工或风险下降，没有隐藏开发摩擦。
+- 事件改善共享系统，而不只修补受影响仓库。
 
-### What to do when stalled
+## 常见失败模式
 
-If hooks block legitimate work, narrow the matcher, add a safe allow path, and test the exact false-positive command before expanding coverage.
+### 形式化产物
 
-If users bypass hooks, investigate whether the control is too broad, too slow, or missing a legitimate exception route.
+目录里充满精美 Markdown，却无人据此决定。填写模板只是因为流程要求，不是下游读者需要；Agent 在 intent、spec 和 plan 中重复文字，评审者只批准格式。
 
-If `REVIEW.md` produces noise, rate findings weekly, sharpen Important, lower the nit cap, and remove checks already handled by CI.
+纠正方式：
 
-If evals are flaky, freeze fixtures, record model and tool versions, separate infrastructure errors, and replace model graders with deterministic checks where possible.
+- 询问每章由谁使用、改变什么决定。
+- 删除或合并无人使用章节。
+- 对照最终 diff 和生产结果抽查产物。
+- 拒绝“遵循最佳实践”“添加测试”等泛泛内容。
+- 宁可短小且有争议，不要冗长仪式化文档。
+- 人工产物反复证实有用后才自动生成。
 
-If the eval pass rate is always perfect, add real failures and harder boundary cases instead of celebrating saturation.
+### 人人直接点击通过的门禁
 
-If CI cost is high, run a small required smoke set on pull requests and the full suite nightly.
+表现为批准耗时近零、从不拒绝流转，却仍遗漏门禁应捕获的缺陷。门禁只有界面或状态，没有决定标准。
 
-If review latency rises, reduce generated diff size and work in smaller independently reviewable changes before adding more agent concurrency.
+纠正方式：
 
-If the team clicks every approval immediately, pause automation and audit a sample of approvals against artifact quality.
+- 明确批准人应评估的条件。
+- 在批准请求旁展示确切证据。
+- 批准绑定被评审提交 SHA。
+- 抽样讨论遗漏，不责备个人。
+- 移除造成疲劳的低价值批准提示。
+- 自动化确定性条件，只将真正判断留给人。
+- 保留独立代码负责人和发布授权。
 
-### Exit criteria
+### 编码后补写 `spec.md`
 
-- Hook false positives are low and reviewed on a stable cadence.
-- `REVIEW.md` findings are rated useful by code owners.
-- Evals fail on known-bad configurations and pass on the approved baseline.
-- CI jobs have bounded tools, identity, budget, timeout, and structured output.
-- Branch protection preserves independent approval.
-- Branch protection dismisses stale approvals when new commits are pushed.
-- Incidents are linked to corrective tests or evals.
-- The team can explain every automated gate and its evidence.
+表现为 spec 提交晚于或等于实现提交，且内容完美复述现有 diff。产物已退化为事后文档，不是 Design 门禁。
 
-## Phase 3: Organization-wide managed settings and shared skills
+纠正方式：
 
-### Goal
+- CI 根据 Git 时间检查产物顺序。
+- 已批准 spec 必须先于已批准 plan 和源代码变更。
+- 紧急流程明确记录例外，恢复后补做回顾性 Design 评审。
+- 不伪造日期或用 squash 隐藏顺序。
+- 经常先做后写时，缩小变更并缩短评审服务时限。
+- 将后期发现作为可见修订，不倒写历史。
 
-Scale stable controls and institutional knowledge across repositories without allowing local configuration to weaken non-negotiable boundaries.
+### 过早过度自动化
 
-Teams retain room to add stricter repository rules and domain-specific skills.
+表现为触发器、hook 和 Agent 任务形成网络，负责人却无法解释为何运行。
 
-The organization controls the minimum floor.
+纠正方式：
 
-### Entry criteria
+- 恢复手动提示推进。
+- 仅保留与真实失败关联的控制。
+- 每次重建一个边界的自动化，并有证据和回滚。
 
-- At least one team meets Phase 2 exit criteria over multiple delivery cycles.
-- Security, platform, compliance, and developer-experience owners agree on the threat model.
-- Every shared policy and skill has a named owner and source of truth.
-- An approved plugin or distribution channel exists.
-- The organization can deploy managed settings in rings and roll them back.
-- Support, exception, and break-glass processes are documented.
-- Audit log retention, privacy, and access rules are approved.
-- Pilot metrics show the controls improve process health without unacceptable friction.
+### 将指导策略误当强制执行
 
-### What to turn on
+表现为技能写着“绝不”，却没有确定性控制检测或阻止违规。
 
-Publish shared skills for policies that must be applied consistently across repositories.
+纠正方式：
 
-Keep service-specific commands and architecture in local `CLAUDE.md` files.
+- 按后果分类规则。
+- 不可协商规则由 hook、分支规则、沙箱策略或 CI 支撑。
+- 技能负责及时解释和流程指导。
 
-Use managed settings to enforce the organization-wide minimum:
+### 将集中安装误当采用
 
-- Permission bypass is disabled.
-- Non-negotiable hooks come only from managed configuration.
-- MCP servers and plugin marketplaces are allowlisted.
-- Sandboxing fails closed where required by data classification.
-- Network egress and credential exposure are restricted.
-- A minimum supported client version is enforced.
-- Production agents have no standing credentials.
+表现为安装覆盖高，但产物质量低、发现被忽略、例外频繁或评审疲劳加剧。
 
-Distribute settings in rings: platform test, volunteer teams, representative business units, then broad deployment.
+纠正方式：
 
-Publish an effective-policy inspection command so teams can see which rule applies and why.
+- 衡量结果与摩擦，不只统计安装量。
+- 与代表团队共同评审产物和控制。
+- 用本地使用证据改进共享基线。
 
-Protect shared skills, managed configuration, eval fixtures, and hook code with policy-owner review.
+## 回滚策略
 
-Run a shared core eval suite plus repository-specific suites.
-
-Provide approved non-interactive CI patterns for read-only triage, review, patch proposal, and deployment preparation.
-
-Keep production release authorization with the existing accountable human role.
-
-### What to measure
-
-- Repositories and active teams on the approved managed baseline.
-- Time from a policy-owner decision to the shared skill release reaching teams.
-- Review findings that cite policy already encoded in a skill.
-- Managed-setting denials and false positives by policy version.
-- Hook bypass attempts and approved exceptions.
-- Sandbox startup failures and blocked egress destinations.
-- Shared and local eval pass rates by configuration version.
-- Time to first merged pull request for a new team member.
-- DORA measures by service class.
-- Gate violations reaching production.
-- Repeat incidents of classes covered by shared controls.
-- Support volume and median exception resolution time.
-
-Use cohort and service-level trends.
-
-Never interpret adoption percentage as proof of value by itself.
-
-### What to do when stalled
-
-If teams reject shared skills, compare them with the current policy source and remove generic instructions that do not produce a concrete action.
-
-If managed settings break local builds, pause the rollout ring, reproduce the denial, and add the smallest reviewed capability rather than a global bypass.
-
-If exception volume grows, group requests by root cause and decide whether the control, documentation, toolchain, or service architecture needs change.
-
-If policy rollout is slow, version the shared plugin, publish compatibility notes, and automate safe distribution instead of asking each team to copy files.
-
-If teams fork skills locally, identify the missing extension point; keep the mandatory core central and permit explicit local overlays.
-
-If dashboards become competitive league tables, remove individual and cross-team rankings and return to service baselines and outcome review.
-
-If a centralized control causes an incident, roll back the policy ring, preserve the evidence, add an eval, and treat the control like production code.
-
-### Exit criteria
-
-Phase 3 is an operating state, not a one-time completion event.
-
-The organization is healthy when:
-
-- The minimum controls are centrally enforced and locally inspectable.
-- Shared skills remain traceable to owned policy.
-- Teams can request and receive bounded exceptions.
-- Configuration changes run through evals and staged rollout.
-- Production authority remains separated from generation authority.
-- Metrics show lower rework or risk without hidden developer friction.
-- Incidents improve the shared system rather than only the affected repository.
-
-## Common failure modes
-
-### Cargo-cult artifacts
-
-The symptom is a complete directory of polished Markdown that nobody uses to decide anything.
-
-Templates are filled because the workflow asks for them, not because a downstream reader needs the content.
-
-Agents repeat the same prose across intent, specification, and plan.
-
-Reviewers approve formatting rather than substance.
-
-Corrective action:
-
-- Ask who consumes each section and what decision it changes.
-- Delete or combine sections with no consumer.
-- Sample artifacts against the final diff and production outcome.
-- Reject generic content such as "follow best practices" or "add tests."
-- Prefer a short disputed artifact to a long ceremonial one.
-- Do not automate creation until manual artifacts repeatedly help.
-
-### Gates everyone clicks through
-
-The symptom is near-zero approval time, no rejected transitions, and defects that the declared gate should have caught.
-
-The gate exists in UI or status but has no decision standard.
-
-Corrective action:
-
-- State the condition the approver must evaluate.
-- Show the exact evidence beside the approval request.
-- Bind approval to the reviewed commit SHA.
-- Sample approved changes and discuss misses without blaming individuals.
-- Remove low-value approval prompts that create fatigue.
-- Automate deterministic conditions and reserve asks for real judgment.
-- Preserve independent code-owner and release authority.
-
-### `spec.md` written after code
-
-The symptom is a specification commit at or after the implementation commit, with language that perfectly describes the existing diff.
-
-The artifact has become retroactive documentation, not a Design gate.
-
-Corrective action:
-
-- Check artifact order from Git timestamps in CI.
-- Require approved `spec.md` before approved `plan.md` and source changes.
-- For an emergency path, record the exception explicitly and run retrospective Design review after recovery.
-- Do not falsify dates or squash away the sequence.
-- If work routinely starts before a spec, reduce change size and shorten the review service level.
-- Treat late discovery as a visible revision, not a reason to write history backward.
-
-### Too much automation too early
-
-The symptom is a web of triggers, hooks, and agent jobs whose owners cannot explain why they run.
-
-Corrective action:
-
-- Return transitions to manual prompts.
-- Keep only controls tied to observed failures.
-- Rebuild automation one boundary at a time with evidence and rollback.
-
-### Advisory policy mistaken for enforcement
-
-The symptom is a skill that says "never" while no deterministic control detects or blocks the forbidden action.
-
-Corrective action:
-
-- Classify the rule by consequence.
-- Back non-negotiable rules with hooks, branch rules, sandbox policy, or CI.
-- Keep the skill as just-in-time explanation and procedure.
-
-### Central rollout mistaken for adoption
-
-The symptom is high installation coverage with low artifact quality, ignored findings, frequent exceptions, or rising review fatigue.
-
-Corrective action:
-
-- Measure outcomes and friction, not installation count alone.
-- Conduct artifact and control reviews with representative teams.
-- Let evidence from local use reshape the shared baseline.
-
-## Rollback policy
-
-Every phase needs a rollback that preserves the audit trail.
-
-Phase 1 rollback stops requiring new artifacts but keeps completed `.sdlc/` history.
-
-Phase 2 rollback disables the failing required check or hook through a reviewed change, never through an undocumented local bypass.
-
-Phase 3 rollback removes the affected managed-policy version from the current deployment ring and restores the last known-good version.
-
-After rollback, record the trigger, impact, decision owner, restored version, and eval that would catch recurrence.
-
-Adoption is successful when the process becomes easier to trust, not merely harder to bypass.
+每阶段都需要保留审计轨迹的回滚。
+阶段 1 停止要求新产物，但保留已有 `.sdlc/` 历史。
+阶段 2 通过经过评审的变更停用失败检查或 hook，不能通过未记录的本地绕过。
+阶段 3 将受影响托管策略版本移出当前推广批次，恢复上一个已知良好版本。
+回滚后记录触发原因、影响、决定负责人、恢复版本及可捕获复发的 eval。
+流程更值得信任才算采用成功，不能只让绕过更困难。

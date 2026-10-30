@@ -1,200 +1,162 @@
-# Metrics
+# 指标
 
-The metrics in this document operationalize the leading and lagging indicators named in [Anthropic's AI-Native SDLC playbook](https://claude.com/blog/the-ai-native-sdlc-playbook).
+本文将 [Anthropic AI 原生 SDLC 实践指南](https://claude.com/blog/the-ai-native-sdlc-playbook)提出的领先与滞后指标落实为可计算定义。
 
-> These are health signals for the delivery process, not developer performance scores. Do not rank, compensate, promote, discipline, or compare individuals with them. Individual scorekeeping will corrupt the data and damage the review behavior the system depends on.
+> 这些是交付流程的健康信号，不是开发者绩效评分。不得用于个人排名、薪酬、晋升、处分或比较。个人计分会污染数据，破坏系统依赖的评审行为。
 
-## How to read the signals
+## 如何解读信号
 
-A leading indicator shows whether the loop is becoming faster, more automated, or more consistent before production outcomes are known.
+领先指标在生产结果未知前，反映流程是否更快、更自动化或更一致；滞后指标反映变更是否经受审查与生产考验、达到预期结果。单独使用任何一种都不充分。
 
-A lagging indicator shows whether the change survived review and production with the intended result.
+更快捕获 intent 可能产生更多低质量需求；更高首次 CI 成功率可能意味着本地反馈改善，也可能是测试削弱；更多合并可能来自流程改善，也可能只是工作更小、更琐碎。
+将速度与质量、自动化与逃逸缺陷、吞吐与返工一起看。
+团队或服务应与自身基线和工作构成比较。耗时使用中位数和分位数，均值会掩盖长队列。
+先区分高风险、常规、事件、依赖和文档变更，再下结论。
 
-Neither kind is sufficient alone.
+## 必需事件模型
 
-Faster intent capture can create more low-quality intents.
+只有产物共享稳定变更键，指标才可靠。在提交、PR、CI 元数据、部署记录、事件和 eval 中使用 `.sdlc/<slug>/` 的 slug。
+至少收集以下事件：
 
-Higher first-pass CI success can mean better local feedback or weaker tests.
-
-More merged changes can mean better flow or smaller, trivial work.
-
-Read speed with quality, automation with escapes, and throughput with rework.
-
-Compare a team or service with its own baseline and work mix.
-
-Use medians and percentiles for elapsed times; averages hide long queues.
-
-Segment high-risk, routine, incident, dependency, and documentation changes before drawing conclusions.
-
-## Required event model
-
-Metrics are reliable only when artifacts share a stable change key.
-
-Use the `.sdlc/<slug>/` slug in commits, pull requests, CI metadata, deployment records, incidents, and eval cases.
-
-At minimum, collect these events:
-
-| Event | Required fields | Source |
+| 事件 | 必需字段 | 来源 |
 | --- | --- | --- |
-| Intent created | slug, first-source time, first-commit time, author | Ticket/chat connector and Git |
-| Intent decided | slug, status, decision time, product owner | Git review or artifact commit |
-| Spec approved | slug, commit SHA, approval time, approver | Git and pull request |
-| Plan approved | slug, commit SHA, approval time, approver | Git and pull request |
-| PR opened | slug, PR number, head SHA, opened time | Git provider |
-| Review event | PR, reviewer type, finding, severity, time, round, scope SHA, author response | Git provider check or review, and `.sdlc/<slug>/review-findings.md` |
-| Check run | PR, SHA, check name, attempt, conclusion, times | CI |
-| Merge | PR, merge SHA, merge time | Git provider |
-| Deployment | merge SHA, environment, start, finish, result | CD platform |
-| Incident | service, deploy SHA, class, start, recovery, severity | Incident system |
-| Band breach | metric, rule, tier, breach time, value | Detector log |
-| Eval run | config SHA, case version, model, result, duration | CI |
+| 创建 intent | slug、最早来源时间、首次提交时间、作者 | 工单／聊天连接器和 Git |
+| intent 决定 | slug、状态、决定时间、产品负责人 | Git 评审或产物提交 |
+| spec 批准 | slug、提交 SHA、批准时间、批准人 | Git 和 PR |
+| plan 批准 | slug、提交 SHA、批准时间、批准人 | Git 和 PR |
+| 创建 PR | slug、PR 编号、head SHA、创建时间 | Git 平台 |
+| 审查事件 | PR、评审者类型、发现、严重程度、时间、轮次、范围 SHA、作者响应 | Git 平台检查／评审及 `.sdlc/<slug>/review-findings.md` |
+| 检查执行 | PR、SHA、检查名、尝试次数、结论、时间 | CI |
+| 合并 | PR、合并 SHA、合并时间 | Git 平台 |
+| 部署 | 合并 SHA、环境、开始、结束、结果 | CD 平台 |
+| 事件 | 服务、部署 SHA、类别、开始、恢复、严重程度 | 事件系统 |
+| 控制带越界 | 指标、规则、级别、越界时间、数值 | 检测器日志 |
+| Eval 执行 | 配置 SHA、案例版本、模型、结果、耗时 | CI |
 
-Preserve raw events.
+保留原始事件。派生看板会变化，证据不应变化。
 
-Derived dashboards change; evidence should not.
+## Plan 指标
 
-## Plan indicators
-
-| Indicator | Precise definition | Compute from Git or workflow data | What good looks like | How it gets gamed |
+| 指标 | 精确定义 | 从 Git 或流程数据计算 | 健康表现 | 可能的操纵方式 |
 | --- | --- | --- | --- | --- |
-| Intent capture time | Hours from the earliest recorded source event for a slug to the first commit adding `.sdlc/<slug>/intent.md` | Join ticket or conversation timestamp to `git log --diff-filter=A --format=%cI -- .sdlc/<slug>/intent.md`; report median and p90 | Falls from the team's baseline without lower acceptance or more late intent edits | Starting the timer late, pre-writing offline, or committing empty templates |
-| Intent survival rate | Accepted intents divided by all intents with a terminal `Accepted` or `Rejected` decision in the period | Parse final status at the decision commit; `accepted / (accepted + rejected)` | Stable enough to show capture is useful; no universal maximum because healthy discovery rejects weak ideas | Accepting everything, never closing weak intents, or deleting rejected artifacts |
-| Post-spec intent edits | Count of commits changing `intent.md` after the first commit adding `spec.md`, per slug | Compare `git log --format=%ct` for both paths; exclude metadata-only automated changes by a declared rule | Low and explainable; material edits represent discovery and restart downstream review | Hiding changed intent in tickets, editing only the spec, or squashing timestamps |
+| intent 捕获时间 | 从 slug 最早来源事件到首次新增 `.sdlc/<slug>/intent.md` 提交的小时数 | 关联工单或聊天时间与 `git log --diff-filter=A --format=%cI -- .sdlc/<slug>/intent.md`，报告中位数和 p90 | 相对基线下降，接受率不降、后期修改不增 | 晚启动计时、线下提前写好、提交空模板 |
+| intent 存活率 | 期间已接受 intent 数／最终决定为 `Accepted` 或 `Rejected` 的 intent 总数 | 解析决定提交的最终状态；`accepted / (accepted + rejected)` | 稳定且表明捕获有用；健康探索会拒绝弱想法，不存在统一最高目标 | 全部接受、不关闭弱需求、删除被拒产物 |
+| spec 后 intent 修改 | 每个 slug 中首次新增 `spec.md` 后修改 `intent.md` 的提交数 | 比较两路径的 `git log --format=%ct`，按声明规则排除纯自动元数据修改 | 较少且可解释；实质变化代表新发现，应重启下游评审 | 将意图变化藏在工单、只改 spec、squash 时间 |
 
-Interpret the three together.
+三项一起看。捕获快但存活率降，可能过早建产物；存活率高但 spec 后频繁修改，可能批准流于形式。
 
-Short capture time with falling survival may mean premature artifacts.
+## Design 指标
 
-High survival with many post-spec edits may mean approval is ceremonial.
-
-## Design indicators
-
-| Indicator | Precise definition | Compute from Git or workflow data | What good looks like | How it gets gamed |
+| 指标 | 精确定义 | 从 Git 或流程数据计算 | 健康表现 | 可能的操纵方式 |
 | --- | --- | --- | --- | --- |
-| Intent-to-spec elapsed time | Hours from the commit that accepts `intent.md` to the commit that first sets `spec.md` to `Approved` | Read status-transition commits for the two paths and subtract committer timestamps; report median and p90 | Decreases while requirements rework and production escapes stay flat or improve | Marking a thin spec approved, resolving policy outside the artifact, or changing timestamps through squash |
-| Requirements rework after build starts | Material `spec.md` commits after the first approved `plan.md`, divided by changes that entered Build | Use `git log --name-status`; classify material versus metadata edits with reviewed labels | Trends down; remaining rework is explicitly classified as discovery, miss, or external change | Calling requirement changes "implementation details" or editing code without updating the spec |
+| intent 到 spec 耗时 | 接受 `intent.md` 的提交到首次将 `spec.md` 设为 `Approved` 的提交之间的小时数 | 读取两路径状态转换提交，计算提交者时间差，报告中位数和 p90 | 时间下降，需求返工与生产逃逸持平或改善 | 批准空泛 spec、在产物外解决策略、用 squash 改时间 |
+| Build 后需求返工 | 首个已批准 `plan.md` 后的实质 `spec.md` 提交数／进入 Build 的变更数 | 使用 `git log --name-status`，用经过评审的标签区分实质与元数据修改 | 趋势下降，剩余返工明确分类为新发现、遗漏或外部变化 | 将需求变化称为“实现细节”、改代码不更新 spec |
 
-Do not set a target of zero requirements rework.
+不要追求零需求返工，零也可能意味着未记录学习。每月抽样复查分类。
 
-Zero can mean no learning is recorded.
+## 仓库记忆与共享技能指标
 
-Review a sample of classifications each month.
-
-## Repository memory and shared-skill indicators
-
-| Indicator | Precise definition | Compute from Git or workflow data | What good looks like | How it gets gamed |
+| 指标 | 精确定义 | 从 Git 或流程数据计算 | 健康表现 | 可能的操纵方式 |
 | --- | --- | --- | --- | --- |
-| Repeated mistakes `CLAUDE.md` should have caught | Confirmed review findings or corrections that match an active root `CLAUDE.md` rule and occurred after that rule merged | Tag findings with rule IDs; join finding time to `CLAUDE.md` rule introduction commit; deduplicate one root cause per PR | Falls toward zero; recurrence triggers instruction clarity, loading, or enforcement review | Giving rules vague IDs, not tagging findings, or moving important rules out of the measured file |
-| Time to first merged PR for a new team member | Elapsed days from team start date to that person's first merged, non-trivial pull request | Join roster start date to first qualifying merge in PR history; publish only cohort aggregates | Falls while onboarding quality, review findings, and early change-failure rate remain sound | Assigning trivial PRs, backdating start, or using it to pressure individuals |
-| Policy approval to skill merge time | Hours from the policy owner's recorded approval of a policy change to merge of the corresponding shared-skill update | Link policy record ID in the skill PR; subtract approval event from `mergedAt` | Predictable and shorter than the old policy-distribution path without bypassing owner review | Recording approval late, pre-merging before approval, or omitting slow changes |
-| Review findings citing encoded policy | Confirmed PR findings citing a policy that an active skill should have applied, per 100 relevant PRs | Tag skill and policy IDs in review findings; divide by PRs where the skill trigger should match | Falls toward zero; persistence identifies trigger failure or drift from the source policy | Avoiding policy tags, narrowing trigger eligibility, or suppressing valid findings |
+| `CLAUDE.md` 本应防止的重复错误 | 根目录现行规则合并后，仍出现与规则匹配的已确认发现或纠正 | 为发现标注规则 ID，关联发生时间和规则引入提交，每 PR 按根因去重 | 趋近零；复发触发指令清晰度、加载或强制机制复查 | 规则 ID 含糊、不标注、将重要规则移出被测文件 |
+| 新成员首次合并 PR 时间 | 入组日期到首次合并非琐碎 PR 的天数 | 关联入组记录和首个合格合并，只发布群组汇总 | 时间下降，入职质量、审查发现和早期失败率保持健康 | 分配琐碎 PR、倒填日期、施压个人 |
+| 策略批准到技能合并时间 | 策略负责人批准变更到对应共享技能更新合并的小时数 | 技能 PR 关联策略记录 ID，用 `mergedAt` 减批准时间 | 可预测且比原分发路径更短，不绕过负责人评审 | 晚记录批准、先合并后批准、遗漏慢变更 |
+| 引用已固化策略的审查发现 | 每 100 个相关 PR 中，本应由活动技能落实的策略仍被违反的已确认发现 | 标记技能和策略 ID，除以应触发技能的 PR 数 | 趋近零；持续存在说明触发失效或偏离源策略 | 不标策略、缩小触发资格、抑制有效发现 |
 
-These signals measure whether institutional knowledge reaches work, not how obedient an individual appears.
+这些信号衡量组织知识是否进入实际工作，不衡量个人看起来多服从。
 
-## Build indicators
+## Build 指标
 
-| Indicator | Precise definition | Compute from Git or workflow data | What good looks like | How it gets gamed |
+| 指标 | 精确定义 | 从 Git 或流程数据计算 | 健康表现 | 可能的操纵方式 |
 | --- | --- | --- | --- | --- |
-| First-pass implementation merge share | Merged change PRs that required no material implementation revision after the first complete agent push, divided by merged change PRs | Mark the first complete push in PR metadata; classify later commits excluding merge-base updates and mechanical formatting | Rises alongside stable review finding severity and change-failure rate | Declaring completion late, packing corrections into the first push, or labeling material fixes mechanical |
-| Plan approval to merged PR | Hours from approved `plan.md` commit to merge time for the linked PR | Join slug and plan approval SHA to PR `mergedAt`; report median, p75, and p90 | Falls without rising rework, review load, or escapes | Approving the plan only after implementation, opening replacement PRs, or excluding stalled work |
-| Rework cycles per change | Number of material author-update cycles after review or failed checks and before merge | Group review-request, check-failure, and subsequent push events; collapse pushes within a defined 15-minute batch | Low and declining for comparable change classes | Combining many fixes into one cycle or avoiding review comments through private messages |
-| Plan/diff match rate | Merged changes whose touched files and material behavior remain within approved `plan.md`, or have approved deviations, divided by merged changes | Compare PR file list with `Files that change`; require entries in `Deviations` for out-of-plan files | High, with visible approved deviations rather than artificial perfection | Writing vague file globs, updating the plan after code without review, or ignoring behavior mismatch |
-| Concurrent sessions per engineer while review quality holds | Median simultaneously active agent sessions during steering windows, segmented by stable review and escape rates | Use session telemetry start/finish plus PR review and incident data; aggregate only at team level | Increases only until review latency or quality begins to degrade | Leaving idle sessions open, counting subagents as full streams, or suppressing findings |
-| Share of day spent steering rather than waiting | Team-level active steering minutes divided by steering plus tool-wait minutes during sampled work | Use privacy-reviewed session telemetry with a published classification; aggregate by team and month | Waiting declines while sustainable workload and review quality hold | Simulating activity, redefining waiting, or using it to monitor individuals |
-| Changes merged per engineer per week, read with rework | Merged change PRs divided by active team members and weeks, always paired with rework and change mix | Count merges by team ownership, not PR author identity; normalize by staffed weeks | Throughput rises without higher rework or failure rate | Splitting trivial PRs, avoiding hard work, attributing agent PRs strategically, or pressuring individuals |
+| 首次实现直接合并占比 | Agent 首次完整推送后无需实质实现修订的已合并 PR／已合并变更 PR | 元数据标记首个完整推送，分类后续提交，排除 merge-base 更新和机械格式化 | 占比上升，发现严重程度与变更失败率稳定 | 晚声明完成、把修正塞进首次推送、将实质修复称为机械修改 |
+| 计划批准到 PR 合并 | 已批准 `plan.md` 提交到关联 PR 合并的小时数 | 关联 slug、批准 SHA 与 PR `mergedAt`，报告中位数、p75、p90 | 下降且返工、审查负荷和逃逸不增 | 实现后才批计划、换 PR、排除停滞工作 |
+| 每变更返工循环 | 评审或检查失败后、合并前的实质作者更新次数 | 关联评审请求、检查失败、后续推送，将约定 15 分钟批次合并计数 | 同类工作较低且下降 | 多修复合并一轮、私聊避免公开评论 |
+| plan／diff 匹配率 | 文件和实质行为在已批准计划内或有已批准偏差的合并变更／全部合并变更 | PR 文件对照 `Files that change`，超范围文件须在 `Deviations` 记录 | 较高且偏差透明获批，不制造完美假象 | 宽泛 glob、编码后无评审改计划、忽略行为不符 |
+| 审查质量稳定时每工程师并发会话 | 指导时段同时活动 Agent 会话的中位数，结合稳定审查与逃逸率分组 | 会话开始／结束遥测加 PR 与事件数据，仅团队汇总 | 仅增加到审查延迟或质量开始恶化之前 | 留空闲会话、把子 Agent 当完整工作流、抑制发现 |
+| 指导时间占比 | 团队主动指导分钟数／指导加工具等待分钟数 | 隐私评审后的遥测及公开分类，按团队和月份聚合 | 等待下降，工作负荷可持续且质量稳定 | 模拟活动、改等待定义、监控个人 |
+| 每工程师每周合并数，结合返工 | 已合并变更 PR／活跃成员数及周数，始终结合返工与变更构成 | 按团队责任归属而非作者身份统计，按实际人员周归一 | 吞吐提高，返工与失败率不增 | 拆琐碎 PR、避难题、策略性归属 Agent PR、施压个人 |
 
-The last three are especially unsafe as individual metrics.
+最后三项尤其不适合作为个人指标。仅发布充分聚合视图，隐藏过小群组。
 
-Publish only sufficiently aggregated views and suppress small cohorts.
+## Test 指标
 
-## Test indicators
-
-| Indicator | Precise definition | Compute from Git or workflow data | What good looks like | How it gets gamed |
+| 指标 | 精确定义 | 从 Git 或流程数据计算 | 健康表现 | 可能的操纵方式 |
 | --- | --- | --- | --- | --- |
-| First-pass CI success rate | PRs whose first complete required-check suite passed without rerun or code change, divided by PRs that started required checks | Use check-run attempts for the first head SHA after implementation completion; count cancelled infrastructure failures separately | Rises while coverage, mutation strength, review findings, and change-failure rate hold | Rerunning until green, weakening checks, delaying CI until local certainty, or excluding flaky failures silently |
-| Review time per PR | Hours from ready-for-review to final required approval, excluding documented author-blocked periods | Use PR ready, review, push, and approval events; report median and p90 by risk class | Falls as evidence quality improves, without shorter superficial reviews or more escapes | Marking ready late, approving before reading, or moving discussion off-platform |
-| Change-failure rate | Production deployments causing an incident, rollback, hotfix, or service impairment within the defined attribution window, divided by production deployments | Join deploy SHA and time to incident, rollback, and hotfix records; publish the attribution window | Stable or falling as deployment frequency increases | Narrow incident definitions, missing deploy linkage, avoiding rollback labels, or batching releases |
-| Eval pass rate | Passed eval cases divided by all valid cases in a run, with the case-set and configuration version fixed | `passed / (passed + failed)` from CI; report invalid and flaky cases separately | Meets the reviewed threshold on discriminating cases; stable across configuration changes | Deleting hard cases, relaxing graders, repeated sampling, or changing fixtures with the config |
-| Incident-to-permanent-eval time | Hours from incident start to merge of a linked regression eval that would detect the relevant failure class | Join incident ID in eval metadata to eval merge timestamp | Falls; high-severity incidents receive a case before corrective action closes | Adding a trivial unrelated case or marking a non-discriminating check as permanent |
-| Regressions caught in CI versus production | Confirmed regressions first found by CI divided by all confirmed regressions first found in CI or production | Classify the earliest trustworthy detection event for each regression ID | CI share rises while total production regressions fall | Overcounting minor CI issues, underreporting production defects, or duplicating one defect into many CI records |
+| 首次 CI 成功率 | 首套完整必需检查无需重跑或改码即通过的 PR／启动必需检查的 PR | 使用实现完成后首个 head SHA 的检查尝试，基础设施取消单独统计 | 覆盖、变异测试强度、审查和失败率稳定时上升 | 重跑到绿、削弱检查、等本地确定才开 CI、隐瞒不稳定失败 |
+| 每 PR 审查耗时 | ready-for-review 到最终必需批准的小时数，排除已记录作者阻塞期 | 使用 ready、review、push、approval 事件，按风险报告中位数和 p90 | 随证据改善下降，不出现浅审或更多逃逸 | 晚标 ready、未读先批、讨论移出平台 |
+| 变更失败率 | 归因窗口内引发事件、回滚、热修或服务受损的生产部署／生产部署总数 | 部署 SHA 和时间关联事件、回滚、热修，公开归因窗口 | 部署频率上升时稳定或下降 | 缩小事件定义、缺部署关联、避回滚标签、批量发布 |
+| Eval 通过率 | 固定案例集与配置版本下，通过案例／全部有效案例 | CI 的 `passed / (passed + failed)`，无效和不稳定案例另报 | 在有区分力案例上达到批准阈值，跨配置保持稳定 | 删难例、放宽评分、重复采样、配置与 fixture 同改 |
+| 事件到永久 eval 时间 | 事件开始到能检测对应失败类别的关联回归 eval 合并的小时数 | 关联 eval 元数据事件 ID 和合并时间 | 时间下降，高严重事件关闭纠正前已有案例 | 无关简单案例、把无区分力检查称为永久回归 |
+| CI 与生产捕获回归比例 | 首次由 CI 发现的已确认回归／首次由 CI 或生产发现的全部已确认回归 | 为每个回归 ID 分类最早可信检测事件 | CI 占比上升，生产回归总数下降 | 夸大轻微 CI 问题、少报生产缺陷、一缺陷拆多记录 |
 
-An eval pass rate without case-set version is not comparable.
+没有案例集版本的 eval 通过率不可比较。每次执行保存确切案例、评分器、模型、工具、权限和配置 SHA。
 
-Store the exact cases, graders, model, tools, permissions, and configuration SHA for every run.
+## Deploy 指标
 
-## Deploy indicators
-
-| Indicator | Precise definition | Compute from Git or workflow data | What good looks like | How it gets gamed |
+| 指标 | 精确定义 | 从 Git 或流程数据计算 | 健康表现 | 可能的操纵方式 |
 | --- | --- | --- | --- | --- |
-| Time to first review | Minutes from PR ready-for-review to the first substantive agent or human review event | Use PR timeline; exclude bot acknowledgements and label-only events | Falls to minutes for automated first pass while Important precision remains acceptable | Posting an empty review, counting a status message, or marking ready late |
-| Review comments resolved without human branch edits | Agent-addressed review threads followed by an agent-authored fix and resolution, divided by all resolved review threads requiring code changes | Join review thread, actor identity, commits, and resolution event | Rises for routine fixes while code-owner approval and escape rate remain sound | Reclassifying human-assisted fixes, resolving without fixing, or avoiding comments |
-| Pre-merge versus escaped defects and vulnerabilities | Confirmed material findings first caught before merge compared with confirmed findings first caught after deployment | Deduplicate findings by root cause; join PR review, scanners, incidents, and external reports | More issues caught earlier and fewer escape in absolute terms | Inflating low-value pre-merge findings or suppressing external and production reports |
-| Approval-gate wait time | Minutes from a hook or environment request entering `ask` state to allow or block verdict, grouped by gate | Subtract timestamps in hook telemetry or deployment environment events; report p50 and p95 | Predictable and within service-level expectations without click-through approval | Auto-approving, requesting approval prematurely, or bypassing the instrumented gate |
-| Reviewer noise | Posted findings whose recorded author response is `wrong`, `intentional`, or `no-impact`, divided by all findings whose response is set | Count the `Response:` field per finding in `.sdlc/<slug>/review-findings.md`; report by severity, since a wrong `Important` costs more than a wrong `Nit` | Falls while pre-merge versus escaped defects holds — a reviewer gets quiet by being right, not by saying less | Leaving responses unset, marking real findings `intentional` to close them, or suppressing findings the reviewer is unsure about |
-| False alarms on clean changes | Findings the reviewer reports when run against `.sdlc/evals/reviewer/clean/`, counted separately for those whose suggested fix would change behavior | Run the clean case set on every reviewer, `REVIEW.md`, or model change; record the run's configuration SHA | Near zero for behavior-changing findings; a harmless nit on a clean change is cheap, a confident wrong fix is not | Curating the clean set to match what the reviewer already passes, or retiring cases it starts failing |
-| Review rounds to pass | Rounds recorded before a change reaches its final review with no Important findings; report the mean and the share needing three or more | Count `## Round` entries per `.sdlc/<slug>/review-findings.md`; a change stopped at the cap counts as not passing | Mean falls toward one and the three-or-more share shrinks, without escaped defects rising | Fixing without re-reviewing, splitting one change across slugs, or reopening the change as a new slug after the cap |
-| Human approvals per PR | Distinct human approvals required before merge, excluding agent and bot identities; report median and p95 | Count approval events by human identity in the Git provider; report fast-path and ordinary changes separately | Steady and deliberate: this is the budget being spent, and it is read against revert and incident rates, never alone | Counting an agent identity as a human, or routing changes onto the fast path to reduce the number |
-| Gate violations reaching production | Count of production events that violated a declared gate condition in the measurement period | Join incidents and audit findings to hook, branch, and release records | Zero; every event triggers control repair and an eval | Narrowing the definition, recording exceptions after the fact, or failing to audit bypass paths |
-| Pipeline failures triaged without paging a human | Failed pipeline runs that received a complete automated classification within the time limit and required no human page, divided by eligible failures | CI job results plus paging events; define eligible classes before measurement | Rises while incorrect triage and time-to-recovery do not worsen | Restricting eligibility after results, avoiding pages when needed, or accepting vague triage |
+| 首次审查时间 | PR ready-for-review 到首次实质 Agent 或人工审查的分钟数 | PR 时间线，排除机器人确认和仅加标签事件 | 自动首审降到分钟级，Important 准确率可接受 | 空审、把状态消息当审查、晚标 ready |
+| 无需真人编辑分支的评论解决率 | Agent 接收、修复并解决的线程／全部需改码的已解决线程 | 关联线程、身份、提交及解决事件 | 常规修复占比提高，代码负责人批准和逃逸率健康 | 错分人工辅助修复、未修即解决、回避评论 |
+| 合并前与逃逸缺陷和漏洞 | 合并前首次发现的已确认实质问题与部署后首次发现问题比较 | 按根因去重，关联 PR、扫描、事件和外部报告 | 更早发现更多，逃逸绝对数减少 | 夸大低价值前置发现、抑制外部和生产报告 |
+| 审批门禁等待 | hook 或环境请求进入 `ask` 到 allow／block 的分钟数，按门禁分组 | hook 遥测或部署事件时间差，报告 p50、p95 | 可预测且满足服务预期，不靠无脑点击 | 自动批准、过早申请、绕过有埋点门禁 |
+| 评审噪声 | 作者响应为 `wrong`、`intentional` 或 `no-impact` 的已发布发现／所有已设置响应的发现 | 统计 `.sdlc/<slug>/review-findings.md` 的 `Response:`，按严重程度报告；错误 Important 成本高于错误 Nit | 噪声下降且前置／逃逸情况不恶化，靠判断正确而非少说话 | 不填响应、真实问题标 intentional、抑制不确定发现 |
+| 干净变更误报 | 对 `.sdlc/evals/reviewer/clean/` 运行评审产生的发现，另计建议会改变行为的发现 | 每次评审者、`REVIEW.md` 或模型变化时执行 clean 集，记录配置 SHA | 改变行为的误报趋近零；无害 Nit 成本低，错误修复成本高 | 只保留已通过案例、删除新失败案例 |
+| 通过所需审查轮数 | 最终无 Important 前记录的轮数，报告均值及至少三轮占比 | 统计 `## Round`；达到上限被停止算未通过 | 均值趋近一、三轮以上比例下降，逃逸不增 | 修复不复审、拆 slug、达上限后换 slug |
+| 每 PR 人工批准数 | 合并前不同真人的必需批准，不含 Agent／机器人，报告中位数和 p95 | 按 Git 平台人类身份计数，快速路径与普通变更分开 | 稳定且审慎，作为判断预算结合回退和事件率看 | 将 Agent 当真人、为减少批准转快速路径 |
+| 进入生产的门禁违规 | 统计期违反已声明门禁的生产事件数 | 事件和审计发现关联 hook、分支及发布记录 | 为零，每次触发控制修复和 eval | 缩定义、事后补例外、不审计绕过路径 |
+| 无需呼叫真人的流水线失败分诊 | 限时内自动完整分类且无需呼叫真人的失败／符合条件的失败 | CI 结果加呼叫事件，测量前定义资格类别 | 比例上升，误分诊与恢复时间不恶化 | 事后限资格、该呼叫时不呼叫、接受模糊分类 |
 
-### DORA measures
+### DORA 指标
 
-The playbook names DORA measures as lagging deployment indicators.
+实践指南将 DORA 作为部署滞后指标。沿用组织已有定义，不在 AI 推广时悄然改变。至少跟踪：
 
-Use the definitions already adopted by the organization and do not silently change them during an AI rollout.
-
-At minimum, track:
-
-| Measure | Precise local computation | What good looks like | How it gets gamed |
+| 指标 | 本地精确计算 | 健康表现 | 可能的操纵方式 |
 | --- | --- | --- | --- |
-| Deployment frequency | Successful production deployments per service per day or week | Increases for comparable services without worse stability | Splitting no-op deploys or counting environments other than production |
-| Lead time for changes | Median and p85 from code commit to successful production deployment | Falls without moving work before the measured commit | Committing late, squashing away waiting, or excluding long-running changes |
-| Change-failure rate | Failed or impairing production deployments divided by all production deployments | Falls or holds while frequency rises | Underreporting incidents or changing the attribution window |
-| Failed-deployment recovery time | Median and p85 from deployment-caused impairment detection to service restoration | Falls through tested rollback and diagnosis | Declaring recovery before users recover or excluding partial degradation |
+| 部署频率 | 每服务每天或每周成功生产部署数 | 可比服务频率提高，稳定性不恶化 | 拆无变更部署、统计非生产环境 |
+| 变更前置时间 | 代码提交到成功生产部署的中位数和 p85 | 时间下降，不将工作移到被测提交之前 | 晚提交、squash 隐藏等待、排除长变更 |
+| 变更失败率 | 失败或损害服务的生产部署／全部生产部署 | 频率上升时下降或稳定 | 少报事件、改归因窗口 |
+| 失败部署恢复时间 | 部署致损被发现到服务恢复的中位数和 p85 | 通过经测试回滚和诊断缩短 | 用户未恢复即宣告、排除部分降级 |
 
-Reliability targets such as service-level objectives remain essential context.
+SLO 等可靠性目标仍是必要背景。服务未达可靠性目标时，交付再快也不健康。
 
-Fast delivery is not healthy when the service misses its reliability objective.
+## Maintain 指标
 
-## Maintain indicators
-
-| Indicator | Precise definition | Compute from Git or workflow data | What good looks like | How it gets gamed |
+| 指标 | 精确定义 | 从 Git 或流程数据计算 | 健康表现 | 可能的操纵方式 |
 | --- | --- | --- | --- | --- |
-| Band-breach-to-intent time | Minutes from deterministic `bands.yaml` breach timestamp to first committed intent in the triage queue | Join detector event ID to intent metadata and Git add timestamp | Falls substantially while false-positive and dismissal rates remain manageable | Creating empty intents, delaying breach timestamps, or suppressing noisy breaches |
-| Findings becoming merged fixes | Unique maintain findings linked to a merged corrective PR divided by triaged findings classified `fix now` or `schedule` whose due window ended | Join finding IDs to PRs; report dismissals and open findings separately | Appropriate to finding quality; trend matters more than a universal high rate | Marking difficult findings dismissed, opening cosmetic fixes, or excluding overdue items |
-| Repeat incidents of the same class | Confirmed incidents whose root-cause class matches a prior incident after its corrective action merged | Incident taxonomy plus linked corrective merge time | Falls; every repeat prompts review of the test, eval, skill, hook, or band | Fragmenting taxonomy so incidents look unique or using an overly broad "other" class |
+| 越界到 intent 时间 | 确定性 `bands.yaml` 越界到分诊队列首次提交 intent 的分钟数 | 检测器事件 ID 关联 intent 元数据和 Git 新增时间 | 大幅下降且误报、驳回率可控 | 空 intent、推迟越界时间、抑制噪声越界 |
+| 发现转为合并修复 | 已关联合并纠正 PR 的唯一运维发现／已分诊为 `fix now` 或 `schedule` 且到期的发现 | 关联发现 ID 与 PR，另报驳回和未关闭项 | 与发现质量相称，重趋势而非统一高值 | 驳回难题、表面修复、排除逾期项 |
+| 同类重复事件 | 先前纠正合并后，根因类别与历史事件相同的已确认事件 | 事件分类及关联纠正合并时间 | 下降，每次复发复查测试、eval、技能、hook 或控制带 | 细分分类伪装唯一性、滥用“其他” |
 
-Track dismissal reason and detector precision with these signals.
+同时跟踪驳回原因和检测器准确率。快速产生大量误报、淹没值班人员的循环不健康。
 
-A fast breach-to-intent loop that floods on-call with false positives is unhealthy.
+### 定期扫描指标
 
-### Scheduled scan indicators
-
-| Indicator | Precise definition | Compute from Git or workflow data | What good looks like | How it gets gamed |
+| 指标 | 精确定义 | 从 Git 或流程数据计算 | 健康表现 | 可能的操纵方式 |
 | --- | --- | --- | --- | --- |
-| Connected repositories on a scan schedule | Repositories with a successful qualifying scan inside their declared schedule window divided by repositories in scan scope | Join approved inventory to scan history; count a repository only when its scheduled run completed | Approaches the agreed scope while failures, cost, and finding ownership remain visible | Shrinking the inventory, counting configured but failed schedules, or excluding large repositories |
-| Finding-to-review-gate time | Hours from validated scheduled-scan finding creation to the linked patch PR becoming ready for review | Join finding ID to PR metadata; report median and p90 by severity; exclude explicitly dismissed findings from this duration but report them separately | Falls for bounded findings without lower patch quality or hidden backlog | Opening empty draft PRs, delaying validation timestamps, or dismissing slow findings |
-| Scheduled-scan versus production vulnerabilities | Confirmed vulnerability classes first found by a scheduled scan compared with those first found in production or by external report | Deduplicate by vulnerability root cause; classify earliest trustworthy source from scan, incident, and disclosure systems | Scheduled detection share rises while absolute production and external discoveries fall | Inflating low-severity scan findings, underreporting external reports, or changing severity thresholds |
-| Findings per scan trend | Validated, non-duplicate findings per completed scan for repositories with at least three comparable runs | Normalize by repository and material code change; preserve model, scope, and rule versions | Declines as fixes and evals accumulate, or changes are explained by broader coverage | Narrowing scan scope, dismissing without reason, switching models, or deduplicating aggressively |
+| 按计划完成扫描的仓库 | 声明窗口内成功完成合格扫描的仓库／扫描范围仓库 | 关联批准清单与扫描历史，只有定期运行完成才计数 | 接近约定范围，失败、成本、发现归属透明 | 缩清单、配置但失败仍计数、排除大仓库 |
+| 发现到评审门禁时间 | 有效扫描发现创建到关联补丁 PR ready-for-review 的小时数 | 关联发现 ID 和 PR，按严重程度报中位数和 p90；排除已明确驳回项耗时但另报数量 | 有界发现耗时下降，补丁质量不降、无隐藏积压 | 空草稿 PR、晚记验证时间、驳回慢发现 |
+| 扫描与生产漏洞比较 | 扫描首次发现的已确认漏洞类别，与生产或外部首次发现比较 | 按根因去重，根据扫描、事件和披露系统最早可信来源分类 | 扫描占比上升，生产和外部绝对数下降 | 夸大低严重扫描、少报外部、改严重阈值 |
+| 每次扫描发现趋势 | 至少三次可比运行仓库中，每次完成扫描的有效非重复发现数 | 按仓库和实质代码变化归一，保留模型、范围和规则版本 | 随修复与 eval 积累下降，或可由覆盖扩大解释 | 缩扫描范围、无理由驳回、换模型、过度去重 |
 
-## Guardrail metrics
+## 护栏指标
 
-Every improvement dashboard should display guardrails beside the target metric.
+每个改进看板都应在目标指标旁展示护栏。
 
-| Target movement | Required guardrails |
+| 目标变化 | 必需护栏 |
 | --- | --- |
-| Faster intent capture | Intent survival, late intent edits, product-owner sample quality |
-| Faster design | Requirements rework, policy conflicts found late, production escapes |
-| Higher first-pass merge | Review findings, rework cycles, plan/diff match, change-failure rate |
-| More concurrent sessions | Review latency, Important precision, rework, sustainable workload survey |
-| Higher CI success | Test coverage quality, flaky rate, mutation or fault-seeding signal, escapes |
-| Faster review | Substantive finding rate, sampled review quality, production defects |
-| More autonomous triage | Triage correctness, missed pages, recovery time, model cost |
-| Faster breach response | Detector precision, dismissal rate, on-call load, repeat incidents |
+| 更快捕获 intent | 存活率、后期修改、产品负责人抽样质量 |
+| 更快设计 | 需求返工、后期策略冲突、生产逃逸 |
+| 更高首次合并 | 审查发现、返工循环、plan／diff 匹配、失败率 |
+| 更多并发会话 | 审查延迟、Important 准确率、返工、可持续工作负荷调查 |
+| 更高 CI 成功率 | 覆盖质量、不稳定率、变异或故障注入信号、逃逸 |
+| 更快审查 | 实质发现率、抽样质量、生产缺陷 |
+| 更自主分诊 | 分类正确率、漏呼叫、恢复时间、模型成本 |
+| 更快越界响应 | 检测准确率、驳回率、值班负荷、重复事件 |
 
-## Query examples
+## 查询示例
 
-Find the first commit for each artifact path:
+查找每项产物首次提交：
 
 ```sh
 git log --diff-filter=A --format='%cI%x09%H' -- .sdlc/<slug>/intent.md
@@ -202,54 +164,41 @@ git log --diff-filter=A --format='%cI%x09%H' -- .sdlc/<slug>/spec.md
 git log --diff-filter=A --format='%cI%x09%H' -- .sdlc/<slug>/plan.md
 ```
 
-Find later specification rework:
+查找后续 spec 返工：
 
 ```sh
 git log --format='%cI%x09%H%x09%s' -- .sdlc/<slug>/spec.md
 ```
 
-Export pull-request timestamps and review events:
+导出 PR 时间戳及评审事件：
 
 ```sh
 gh pr list --state merged --limit 100 --json number,createdAt,mergedAt,reviews,commits,labels
 ```
 
-Export check runs for an exact commit:
+导出确切提交的检查执行：
 
 ```sh
 gh api repos/{owner}/{repo}/commits/<sha>/check-runs
 ```
 
-These commands expose source events; a production metric pipeline should normalize them into the event model and preserve timezone-aware timestamps.
+这些命令提供源事件。生产指标流水线应归一到事件模型，保留带时区时间戳。
 
-## Reporting cadence
+## 报告节奏
 
-Review flow metrics weekly at the team level.
+每周在团队级评审流动指标。
+每月或样本足够时评审质量、eval 和生产结果。
+立即复查每次门禁违规和高严重重复事件。
+定义纳入版本管理，看板变化加注释。
+小群组发布置信区间或样本数，不把自然波动变成追逐目标。
 
-Review quality, eval, and production outcomes monthly or when sample size is sufficient.
+## 防操纵策略
 
-Review every gate violation and high-severity repeat incident immediately.
-
-Keep definitions in version control and annotate dashboard changes.
-
-Publish confidence intervals or sample counts when cohorts are small.
-
-Do not turn natural variation into a target chase.
-
-## Anti-gaming policy
-
-Never attach a metric target to an individual quota.
-
-Never reward fewer review comments, more commits, more PRs, more agent sessions, or higher acceptance in isolation.
-
-Never remove failed, rejected, dismissed, or slow work from historical data to improve a trend.
-
-Never change a definition without backfilling history or marking the series break.
-
-Sample the underlying artifacts and outcomes, not only the dashboard.
-
-Invite teams to report where a metric creates the wrong incentive.
-
-When a signal becomes a target and stops describing reality, retire or redesign it.
-
-The desired outcome is a process that learns quickly and fails safely, not a chart that is always green.
+不将指标目标绑定个人配额。
+不单独奖励更少评论、更多提交／PR／Agent 会话或更高接受率。
+不为改善趋势从历史移除失败、拒绝、驳回或缓慢工作。
+更改定义必须回填历史或标记序列断点。
+抽样底层产物和结果，不只看仪表板。
+鼓励团队报告错误激励。
+信号成为目标且不再反映现实，就停用或重设计。
+期望结果是快速学习、安全失败的流程，不是永远绿色的图表。
